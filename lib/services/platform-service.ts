@@ -421,15 +421,15 @@ export class PlatformService extends EventEmitter implements IPlatformService {
 		await this.trackProjectType(projectData);
 		const isForDevice = this.$mobileHelper.isAndroidPlatform(platform) ? null : buildConfig && buildConfig.buildForDevice;
 		await this.trackActionForPlatform({ action: "Build", platform, isForDevice });
-
+		this.$logger.out("fyhao DEBUG buildPlatform 1"); // temp debug
 		let platformData = this.$platformsData.getPlatformData(platform, projectData);
 		const handler = (data: any) => {
 			this.emit(constants.BUILD_OUTPUT_EVENT_NAME, data);
 			this.$logger.printInfoMessageOnSameLine(data.data.toString());
 		};
-
+		this.$logger.out("fyhao DEBUG buildPlatform 2"); // temp debug
 		await attachAwaitDetach(constants.BUILD_OUTPUT_EVENT_NAME, platformData.platformProjectService, handler, platformData.platformProjectService.buildProject(platformData.projectRoot, projectData, buildConfig));
-
+		this.$logger.out("fyhao DEBUG buildPlatform 3"); // temp debug
 		let prepareInfo = this.$projectChangesService.getPrepareInfo(platform, projectData);
 		let buildInfoFilePath = this.getBuildOutputPath(platform, platformData, buildConfig);
 		let buildInfoFile = path.join(buildInfoFilePath, buildInfoFileName);
@@ -437,6 +437,7 @@ export class PlatformService extends EventEmitter implements IPlatformService {
 			prepareTime: prepareInfo.changesRequireBuildTime,
 			buildTime: new Date().toString()
 		};
+		this.$logger.out("fyhao DEBUG buildPlatform 4"); // temp debug
 		this.$fs.writeJson(buildInfoFile, buildInfo);
 		this.$logger.out("Project successfully built.");
 	}

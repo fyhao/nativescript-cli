@@ -268,13 +268,14 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	}
 
 	public async buildProject(projectRoot: string, projectData: IProjectData, buildConfig: IBuildConfig): Promise<void> {
+		this.$logger.out("ios-project-service buildProject... fyhao DEBUG"); // temp debug
 		let basicArgs = [
 			"-configuration", buildConfig.release ? "Release" : "Debug",
 			"build",
 			'SHARED_PRECOMPS_DIR=' + path.join(projectRoot, 'build', 'sharedpch')
 		];
 		basicArgs = basicArgs.concat(this.xcbuildProjectArgs(projectRoot, projectData));
-
+		this.$logger.out("fyhao DEBUG buildProject 1"); // temp debug
 		// Starting from tns-ios 1.4 the xcconfig file is referenced in the project template
 		let frameworkVersion = this.getFrameworkVersion(this.getPlatformData(projectData).frameworkPackageName, projectData.projectDir);
 		if (semver.lt(frameworkVersion, "1.4.0")) {
@@ -291,13 +292,15 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		const handler = (data: any) => {
 			this.emit(constants.BUILD_OUTPUT_EVENT_NAME, data);
 		};
-
+this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 		if (buildConfig.buildForDevice) {
+			this.$logger.out("fyhao DEBUG buildProject 3 buildForDevice"); // temp debug
 			await attachAwaitDetach(constants.BUILD_OUTPUT_EVENT_NAME,
 				this.$childProcess,
 				handler,
 				this.buildForDevice(projectRoot, basicArgs, buildConfig, projectData));
 		} else {
+			this.$logger.out("fyhao DEBUG buildProject 4 buildForSimulator"); // temp debug
 			await attachAwaitDetach(constants.BUILD_OUTPUT_EVENT_NAME,
 				this.$childProcess,
 				handler,
@@ -322,7 +325,7 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 			'ARCHS=armv7 arm64',
 			'VALID_ARCHS=armv7 arm64'
 		];
-
+		this.$logger.out("fyhao DEBUG buildForDevice 1"); // temp debug
 		// build only for device specific architecture
 		if (!buildConfig.release && !buildConfig.architectures) {
 			await this.$devicesService.initialize({ platform: this.$devicePlatformsConstants.iOS.toLowerCase(), deviceId: buildConfig.device });
@@ -350,12 +353,13 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 			"-sdk", "iphoneos",
 			"CONFIGURATION_BUILD_DIR=" + path.join(projectRoot, "build", "device")
 		]);
-
+		this.$logger.out("fyhao DEBUG buildForDevice 2"); // temp debug
 		let xcodeBuildVersion = await this.getXcodeVersion();
 		if (helpers.versionCompare(xcodeBuildVersion, "8.0") >= 0) {
 			await this.setupSigningForDevice(projectRoot, buildConfig, projectData);
 		}
-
+		this.$logger.out("fyhao DEBUG buildForDevice 3"); // temp debug
+		this.$logger.out("fyhao DEBUG buildForDevice 4: " + JSON.stringify(buildConfig)); // temp debug
 		if (buildConfig && buildConfig.codeSignIdentity) {
 			args.push(`CODE_SIGN_IDENTITY=${buildConfig.codeSignIdentity}`);
 		}
@@ -367,7 +371,8 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		if (buildConfig && buildConfig.teamIdentifier) {
 			args.push(`DEVELOPMENT_TEAM=${buildConfig.teamIdentifier}`);
 		}
-
+		this.$logger.out("fyhao DEBUG buildForDevice 5 xcodebuild"); // temp debug
+		this.$logger.out("fyhao DEBUG buildForDevice 6: " + JSON.stringify(args)); // temp debug
 		// this.$logger.out("xcodebuild...");
 		await this.$childProcess.spawnFromEvent("xcodebuild",
 			args,
@@ -375,7 +380,7 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 			{ stdio: buildConfig.buildOutputStdio || "inherit", cwd: this.getPlatformData(projectData).projectRoot },
 			{ emitOptions: { eventName: constants.BUILD_OUTPUT_EVENT_NAME }, throwError: true });
 		// this.$logger.out("xcodebuild build succeded.");
-
+		this.$logger.out("fyhao DEBUG buildForDevice 7 xcodebuild build succeeded"); // temp debug
 		await this.createIpa(projectRoot, projectData, buildConfig);
 	}
 
@@ -427,23 +432,29 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	private async setupSigningForDevice(projectRoot: string, buildConfig: IiOSBuildConfig, projectData: IProjectData): Promise<void> {
 		const xcode = this.$pbxprojDomXcode.Xcode.open(this.getPbxProjPath(projectData));
 		const signing = xcode.getSigning(projectData.projectName);
-
+		this.$logger.out("fyhao DEBUG setupSigningForDevice 1"); // temp debug
 		const hasProvisioningProfileInXCConfig =
 			this.readXCConfigProvisioningProfileSpecifierForIPhoneOs(projectData) ||
 			this.readXCConfigProvisioningProfileSpecifier(projectData) ||
 			this.readXCConfigProvisioningProfileForIPhoneOs(projectData) ||
 			this.readXCConfigProvisioningProfile(projectData);
-
+		this.$logger.out("fyhao DEBUG setupSigningForDevice 2 hasProvisioningProfileInXCConfig:" + hasProvisioningProfileInXCConfig + ", signing" + signing); // temp debug
+		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectData: " + JSON.stringify(projectData)); // temp debug
+		this.$logger.out("fyhao DEBUG setupSigningForDevice x: buildConfig: " + JSON.stringify(buildConfig)); // temp debug
+		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectRoot: " + JSON.stringify(projectRoot)); // temp debug
 		if (hasProvisioningProfileInXCConfig && (!signing || signing.style !== "Manual")) {
+			this.$logger.out("fyhao DEBUG setupSigningForDevice 3"); // temp debug
 			xcode.setManualSigningStyle(projectData.projectName);
 			xcode.save();
+			this.$logger.out("fyhao DEBUG setupSigningForDevice 3.1"); // temp debug
 		} else if (!buildConfig.provision && !(signing && signing.style === "Manual" && !buildConfig.teamId)) {
+			this.$logger.out("fyhao DEBUG setupSigningForDevice 4"); // temp debug
 			if (buildConfig) {
 				delete buildConfig.teamIdentifier;
 			}
-
+			this.$logger.out("fyhao DEBUG setupSigningForDevice 4.1"); // temp debug
 			const teamId = await this.getDevelopmentTeam(projectData, buildConfig.teamId);
-
+			this.$logger.out("fyhao DEBUG setupSigningForDevice 4.2"); // temp debug
 			xcode.setAutomaticSigningStyle(projectData.projectName, teamId);
 			xcode.save();
 			this.$logger.trace("Set Automatic signing style and team.");
