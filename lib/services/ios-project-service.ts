@@ -439,9 +439,9 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 			this.readXCConfigProvisioningProfileForIPhoneOs(projectData) ||
 			this.readXCConfigProvisioningProfile(projectData);
 		this.$logger.out("fyhao DEBUG setupSigningForDevice 2 hasProvisioningProfileInXCConfig:" + hasProvisioningProfileInXCConfig + ", signing" + signing); // temp debug
-		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectData: " + JSON.stringify(projectData)); // temp debug
+		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectData: " + projectData); // temp debug
 		this.$logger.out("fyhao DEBUG setupSigningForDevice x: buildConfig: " + JSON.stringify(buildConfig)); // temp debug
-		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectRoot: " + JSON.stringify(projectRoot)); // temp debug
+		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectRoot: " + projectRoot); // temp debug
 		if (hasProvisioningProfileInXCConfig && (!signing || signing.style !== "Manual")) {
 			this.$logger.out("fyhao DEBUG setupSigningForDevice 3"); // temp debug
 			xcode.setManualSigningStyle(projectData.projectName);
