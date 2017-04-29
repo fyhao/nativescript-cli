@@ -371,6 +371,10 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 		if (buildConfig && buildConfig.teamIdentifier) {
 			args.push(`DEVELOPMENT_TEAM=${buildConfig.teamIdentifier}`);
 		}
+		// TODO fyhao manually add in code sign identity, provisioning profile and development team above.... think of process env
+		this.$logger.out("fyhao DEBUG buildForDevice 4.1 env CODE_SIGN_IDENTITY: " + process.env.CODE_SIGN_IDENTITY); // temp debug
+		this.$logger.out("fyhao DEBUG buildForDevice 4.1 env PROVISIONING_PROFILE: " + process.env.PROVISIONING_PROFILE); // temp debug
+		this.$logger.out("fyhao DEBUG buildForDevice 4.1 env DEVELOPMENT_TEAM: " + process.env.DEVELOPMENT_TEAM); // temp debug
 		this.$logger.out("fyhao DEBUG buildForDevice 5 xcodebuild"); // temp debug
 		this.$logger.out("fyhao DEBUG buildForDevice 6: " + JSON.stringify(args)); // temp debug
 		// this.$logger.out("xcodebuild...");
@@ -442,23 +446,28 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectData: " + projectData); // temp debug
 		this.$logger.out("fyhao DEBUG setupSigningForDevice x: buildConfig: " + JSON.stringify(buildConfig)); // temp debug
 		this.$logger.out("fyhao DEBUG setupSigningForDevice x: projectRoot: " + projectRoot); // temp debug
-		if (hasProvisioningProfileInXCConfig && (!signing || signing.style !== "Manual")) {
-			this.$logger.out("fyhao DEBUG setupSigningForDevice 3"); // temp debug
-			xcode.setManualSigningStyle(projectData.projectName);
-			xcode.save();
-			this.$logger.out("fyhao DEBUG setupSigningForDevice 3.1"); // temp debug
-		} else if (!buildConfig.provision && !(signing && signing.style === "Manual" && !buildConfig.teamId)) {
-			this.$logger.out("fyhao DEBUG setupSigningForDevice 4"); // temp debug
-			if (buildConfig) {
-				delete buildConfig.teamIdentifier;
+		try {
+			if (hasProvisioningProfileInXCConfig && (!signing || signing.style !== "Manual")) {
+				this.$logger.out("fyhao DEBUG setupSigningForDevice 3"); // temp debug
+				xcode.setManualSigningStyle(projectData.projectName);
+				xcode.save();
+				this.$logger.out("fyhao DEBUG setupSigningForDevice 3.1"); // temp debug
+			} else if (!buildConfig.provision && !(signing && signing.style === "Manual" && !buildConfig.teamId)) {
+				this.$logger.out("fyhao DEBUG setupSigningForDevice 4"); // temp debug
+				if (buildConfig) {
+					delete buildConfig.teamIdentifier;
+				}
+				this.$logger.out("fyhao DEBUG setupSigningForDevice 4.1"); // temp debug
+				const teamId = await this.getDevelopmentTeam(projectData, buildConfig.teamId);
+				this.$logger.out("fyhao DEBUG setupSigningForDevice 4.2"); // temp debug
+				xcode.setAutomaticSigningStyle(projectData.projectName, teamId);
+				xcode.save();
+				this.$logger.trace("Set Automatic signing style and team.");
 			}
-			this.$logger.out("fyhao DEBUG setupSigningForDevice 4.1"); // temp debug
-			const teamId = await this.getDevelopmentTeam(projectData, buildConfig.teamId);
-			this.$logger.out("fyhao DEBUG setupSigningForDevice 4.2"); // temp debug
-			xcode.setAutomaticSigningStyle(projectData.projectName, teamId);
-			xcode.save();
-			this.$logger.trace("Set Automatic signing style and team.");
+		} catch (e) {
+			this.$logger.out("fyhao DEBUG setupSigningForDevice 5: " + e); // temp debug
 		}
+		
 	}
 
 	private async buildForSimulator(projectRoot: string, args: string[], projectData: IProjectData, buildOutputStdio?: string): Promise<void> {
