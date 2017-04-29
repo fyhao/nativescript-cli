@@ -257,8 +257,8 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 			"-archivePath", archivePath,
 			"-exportPath", exportPath
 		];
-		if(process.env.PROVISIONING_PROFILE) {
-			args.push('-exportProvisioningProfile', process.env.PROVISIONING_PROFILE);
+		if(process.env.PROFILE_NAME) {
+			args.push('-exportProvisioningProfile', process.env.PROFILE_NAME);
 		}
 		if(process.env.CODE_SIGN_IDENTITY) {
 			args.push('-exportSigningIdentity', process.env.CODE_SIGN_IDENTITY);
