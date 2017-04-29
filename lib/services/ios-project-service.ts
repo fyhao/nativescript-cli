@@ -178,12 +178,18 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	 * Returns the path to the .xcarchive.
 	 */
 	public async archive(projectData: IProjectData, buildConfig?: IBuildConfig, options?: { archivePath?: string }): Promise<string> {
+		this.$logger.out("fyhao DEBUG archive 1"); // temp debug
 		let projectRoot = this.getPlatformData(projectData).projectRoot;
+		this.$logger.out("fyhao DEBUG archive 2"); // temp debug
 		let archivePath = options && options.archivePath ? path.resolve(options.archivePath) : path.join(projectRoot, "/build/archive/", projectData.projectName + ".xcarchive");
+		this.$logger.out("fyhao DEBUG archive 3 archivePath: " + archivePath); // temp debug
 		let args = ["archive", "-archivePath", archivePath, "-configuration",
 			(!buildConfig || buildConfig.release) ? "Release" : "Debug"]
 			.concat(this.xcbuildProjectArgs(projectRoot, projectData, "scheme"));
+		this.$logger.out("fyhao DEBUG archive 4 args: " + JSON.stringify(args)); // temp debug
+		this.$logger.out("fyhao DEBUG archive 5 xcodebuild start "); // temp debug
 		await this.$childProcess.spawnFromEvent("xcodebuild", args, "exit", { stdio: 'inherit' });
+		this.$logger.out("fyhao DEBUG archive 6 xcodebuild end archivePath: " + archivePath); // temp debug
 		return archivePath;
 	}
 
@@ -236,24 +242,28 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	 * Exports .xcarchive for a development device.
 	 */
 	private async exportDevelopmentArchive(projectData: IProjectData, buildConfig: IBuildConfig, options: { archivePath: string, exportDir?: string, teamID?: string }): Promise<string> {
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1"); // temp debug
 		let platformData = this.getPlatformData(projectData);
 		let projectRoot = platformData.projectRoot;
 		let archivePath = options.archivePath;
 		let buildOutputPath = path.join(projectRoot, "build", "device");
-
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 2 buildOutputPath: " + buildOutputPath); // temp debug
 		// The xcodebuild exportPath expects directory and writes the <project-name>.ipa at that directory.
 		let exportPath = path.resolve(options.exportDir || buildOutputPath);
 		let exportFile = path.join(exportPath, projectData.projectName + ".ipa");
-
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 3 exportPath: " + exportPath); // temp debug
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 4 exportFile: " + exportFile); // temp debug
 		let args = ["-exportArchive",
 			"-archivePath", archivePath,
 			"-exportPath", exportPath,
 			"-exportOptionsPlist", platformData.configurationFilePath
 		];
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 5 args: " + args); // temp debug
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 6 xcodebuild start"); // temp debug
 		await this.$childProcess.spawnFromEvent("xcodebuild", args, "exit",
 			{ stdio: buildConfig.buildOutputStdio || 'inherit', cwd: this.getPlatformData(projectData).projectRoot },
 			{ emitOptions: { eventName: constants.BUILD_OUTPUT_EVENT_NAME }, throwError: true });
-
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 7 xcodebuild end exportFile: " + exportFile); // temp debug
 		return exportFile;
 	}
 
@@ -495,13 +505,15 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 	}
 
 	private async createIpa(projectRoot: string, projectData: IProjectData, buildConfig: IBuildConfig): Promise<string> {
+		this.$logger.out("fyhao DEBUG createIpa 1 projectRoot:" + projectRoot + ', buildConfig: ' + JSON.stringify(buildConfig)); // temp debug
 		let xarchivePath = await this.archive(projectData, buildConfig);
+		this.$logger.out("fyhao DEBUG createIpa 2 xarchivePath: " + xarchivePath); // temp debug
 		let exportFileIpa = await this.exportDevelopmentArchive(projectData,
 			buildConfig,
 			{
 				archivePath: xarchivePath,
 			});
-
+		this.$logger.out("fyhao DEBUG createIpa 3"); // temp debug
 		return exportFileIpa;
 	}
 
