@@ -258,6 +258,9 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 			"-exportPath", exportPath,
 			"-exportOptionsPlist", platformData.configurationFilePath
 		];
+		if(process.env.PROVISIONING_PROFILE) {
+			args.push('-exportProvisioningProfile', process.env.PROVISIONING_PROFILE);
+		}
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 5 args: " + args); // temp debug
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 6 xcodebuild start"); // temp debug
 		await this.$childProcess.spawnFromEvent("xcodebuild", args, "exit",
