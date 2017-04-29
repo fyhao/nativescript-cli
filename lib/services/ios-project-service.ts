@@ -375,6 +375,15 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 		this.$logger.out("fyhao DEBUG buildForDevice 4.1 env CODE_SIGN_IDENTITY: " + process.env.CODE_SIGN_IDENTITY); // temp debug
 		this.$logger.out("fyhao DEBUG buildForDevice 4.1 env PROVISIONING_PROFILE: " + process.env.PROVISIONING_PROFILE); // temp debug
 		this.$logger.out("fyhao DEBUG buildForDevice 4.1 env DEVELOPMENT_TEAM: " + process.env.DEVELOPMENT_TEAM); // temp debug
+		if(process.env.CODE_SIGN_IDENTITY) {
+			args.push('CODE_SIGN_IDENTITY=' + process.env.CODE_SIGN_IDENTITY);
+		}
+		if(process.env.PROVISIONING_PROFILE) {
+			args.push('PROVISIONING_PROFILE=' + process.env.PROVISIONING_PROFILE);
+		}
+		if(process.env.DEVELOPMENT_TEAM) {
+			args.push('DEVELOPMENT_TEAM=' + process.env.DEVELOPMENT_TEAM);
+		}
 		this.$logger.out("fyhao DEBUG buildForDevice 5 xcodebuild"); // temp debug
 		this.$logger.out("fyhao DEBUG buildForDevice 6: " + JSON.stringify(args)); // temp debug
 		// this.$logger.out("xcodebuild...");
