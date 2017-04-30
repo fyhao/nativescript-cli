@@ -291,7 +291,7 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		let args = ["-exportArchive",
 			"-archivePath", archivePath,
 			"-exportPath", exportPath,
-			"-exportOptionsPlist", exportOptionsPlist
+			"-exportOptionsPlist", platformData.configurationFilePath
 		];
 		/*
 		if(process.env.EXPORT_PROVISIONING_PROFILE) {
