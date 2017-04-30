@@ -260,8 +260,8 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		if(process.env.EXPORT_PROVISIONING_PROFILE) {
 			args.push('-exportProvisioningProfile', process.env.EXPORT_PROVISIONING_PROFILE);
 		}
-		if(process.env.CODE_SIGN_IDENTITY) {
-			args.push('-exportSigningIdentity', process.env.CODE_SIGN_IDENTITY);
+		if(process.env.EXPORT_SIGN_IDENTITY) {
+			args.push('-exportSigningIdentity', process.env.EXPORT_SIGN_IDENTITY);
 		}
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 5 args: " + args); // temp debug
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 6 xcodebuild start"); // temp debug
