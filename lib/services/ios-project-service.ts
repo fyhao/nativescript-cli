@@ -258,52 +258,16 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		var con = fss.readFileSync(platformData.configurationFilePath,'utf8');
 		this.$logger.out('fyhao DEBUG con: ' + con);
 		
-		
-		
-		// These are the options that you can set in the Xcode UI when exporting for AppStore deployment.
-		let plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-`;
-		if (options && options.teamID) {
-			plistTemplate += `    <key>teamID</key>
-    <string>${options.teamID}</string>
-`;
-		}
-		plistTemplate += `    <key>method</key>
-    <string>app-store</string>
-    <key>uploadBitcode</key>
-    <false/>
-    <key>uploadSymbols</key>
-    <false/>
-</dict>
-</plist>`;
-
-		// Save the options...
-		temp.track();
-		let exportOptionsPlist = temp.path({ prefix: "export-", suffix: ".plist" });
-		this.$fs.writeFile(exportOptionsPlist, plistTemplate);
-		
-		this.$logger.out('fyhao DEBUG exportDevelopmentArchive 4.2 exportOptionsPlist:' + exportOptionsPlist);
-		this.$logger.out('fyhao DEBUG exportDevelopmentArchive 4.3 plistTemplate:' + plistTemplate);
-		
 		let args = ["-exportArchive",
 			"-archivePath", archivePath,
 			"-exportPath", exportPath,
 			"-exportOptionsPlist", platformData.configurationFilePath
 		];
-		/*
-		if(process.env.EXPORT_PROVISIONING_PROFILE) {
-			args.push('-exportProvisioningProfile', process.env.EXPORT_PROVISIONING_PROFILE);
-		}
-		if(process.env.EXPORT_SIGN_IDENTITY) {
-			args.push('-exportSigningIdentity', process.env.EXPORT_SIGN_IDENTITY);
-		}
-		*/
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 5 args: " + args); // temp debug
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 6 xcodebuild start"); // temp debug
-		await this.$childProcess.spawnFromEvent("/Users/travis/build/fyhao/tns-webform-client/scripts/xcbuild-safe.sh", args, "exit",
+		//"/Users/travis/build/fyhao/tns-webform-client/scripts/xcbuild-safe.sh"
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 6.1 xcodebuild process.env.XCBUILD_SAFE_SH: " + process.env.XCBUILD_SAFE_SH); // temp debug
+		await this.$childProcess.spawnFromEvent(process.env.XCBUILD_SAFE_SH, args, "exit",
 			{ stdio: buildConfig.buildOutputStdio || 'inherit', cwd: this.getPlatformData(projectData).projectRoot },
 			{ emitOptions: { eventName: constants.BUILD_OUTPUT_EVENT_NAME }, throwError: true });
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 7 xcodebuild end exportFile: " + exportFile); // temp debug
