@@ -243,6 +243,9 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	 */
 	private async exportDevelopmentArchive(projectData: IProjectData, buildConfig: IBuildConfig, options: { archivePath: string, exportDir?: string, teamID?: string }): Promise<string> {
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1"); // temp debug
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1.1 archivePath:" + archivePath); // temp debug
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1.2 exportDir:" + exportDir); // temp debug
+		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1.3 teamID:" + teamID); // temp debug
 		let platformData = this.getPlatformData(projectData);
 		let projectRoot = platformData.projectRoot;
 		let archivePath = options.archivePath;
@@ -254,17 +257,53 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 3 exportPath: " + exportPath); // temp debug
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 4 exportFile: " + exportFile); // temp debug
 		this.$logger.out('fyhao DEBUG exportDevelopmentArchive 4.1 platformData.configurationFilePath:' + platformData.configurationFilePath);
+		var fss = require('fs');
+		var con = fss.readFileSync(platformData.configurationFilePath,'utf8');
+		this.$logger.out('fyhao DEBUG con: ' + con);
+		
+		
+		
+		// These are the options that you can set in the Xcode UI when exporting for AppStore deployment.
+		let plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+`;
+		if (options && options.teamID) {
+			plistTemplate += `    <key>teamID</key>
+    <string>${options.teamID}</string>
+`;
+		}
+		plistTemplate += `    <key>method</key>
+    <string>app-store</string>
+    <key>uploadBitcode</key>
+    <false/>
+    <key>uploadSymbols</key>
+    <false/>
+</dict>
+</plist>`;
+
+		// Save the options...
+		temp.track();
+		let exportOptionsPlist = temp.path({ prefix: "export-", suffix: ".plist" });
+		this.$fs.writeFile(exportOptionsPlist, plistTemplate);
+		
+		this.$logger.out('fyhao DEBUG exportDevelopmentArchive 4.2 exportOptionsPlist:' + exportOptionsPlist);
+		this.$logger.out('fyhao DEBUG exportDevelopmentArchive 4.3 plistTemplate:' + plistTemplate);
+		
 		let args = ["-exportArchive",
 			"-archivePath", archivePath,
 			"-exportPath", exportPath,
-			"-exportOptionsPlist", platformData.configurationFilePath
+			"-exportOptionsPlist", exportOptionsPlist
 		];
+		/*
 		if(process.env.EXPORT_PROVISIONING_PROFILE) {
 			args.push('-exportProvisioningProfile', process.env.EXPORT_PROVISIONING_PROFILE);
 		}
 		if(process.env.EXPORT_SIGN_IDENTITY) {
 			args.push('-exportSigningIdentity', process.env.EXPORT_SIGN_IDENTITY);
 		}
+		*/
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 5 args: " + args); // temp debug
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 6 xcodebuild start"); // temp debug
 		await this.$childProcess.spawnFromEvent("xcodebuild", args, "exit",
