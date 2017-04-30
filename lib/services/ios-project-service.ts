@@ -243,9 +243,6 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	 */
 	private async exportDevelopmentArchive(projectData: IProjectData, buildConfig: IBuildConfig, options: { archivePath: string, exportDir?: string, teamID?: string }): Promise<string> {
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1"); // temp debug
-		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1.1 archivePath:" + archivePath); // temp debug
-		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1.2 exportDir:" + exportDir); // temp debug
-		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 1.3 teamID:" + teamID); // temp debug
 		let platformData = this.getPlatformData(projectData);
 		let projectRoot = platformData.projectRoot;
 		let archivePath = options.archivePath;
