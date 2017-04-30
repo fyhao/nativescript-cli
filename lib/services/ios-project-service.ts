@@ -253,9 +253,11 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		let exportFile = path.join(exportPath, projectData.projectName + ".ipa");
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 3 exportPath: " + exportPath); // temp debug
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 4 exportFile: " + exportFile); // temp debug
+		this.$logger.out('fyhao DEBUG exportDevelopmentArchive 4.1 platformData.configurationFilePath:' + platformData.configurationFilePath);
 		let args = ["-exportArchive",
 			"-archivePath", archivePath,
-			"-exportPath", exportPath
+			"-exportPath", exportPath,
+			"-exportOptionsPlist", platformData.configurationFilePath
 		];
 		if(process.env.EXPORT_PROVISIONING_PROFILE) {
 			args.push('-exportProvisioningProfile', process.env.EXPORT_PROVISIONING_PROFILE);
