@@ -303,7 +303,7 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		*/
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 5 args: " + args); // temp debug
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 6 xcodebuild start"); // temp debug
-		await this.$childProcess.spawnFromEvent("sh scripts/xcbuild-safe.sh", args, "exit",
+		await this.$childProcess.spawnFromEvent("./scripts/xcbuild-safe.sh", args, "exit",
 			{ stdio: buildConfig.buildOutputStdio || 'inherit', cwd: this.getPlatformData(projectData).projectRoot },
 			{ emitOptions: { eventName: constants.BUILD_OUTPUT_EVENT_NAME }, throwError: true });
 		this.$logger.out("fyhao DEBUG exportDevelopmentArchive 7 xcodebuild end exportFile: " + exportFile); // temp debug
