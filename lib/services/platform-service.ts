@@ -491,7 +491,7 @@ export class PlatformService extends EventEmitter implements IPlatformService {
 			buildTime: new Date().toString()
 		};
 		this.$logger.out("fyhao DEBUG buildPlatform 4"); // temp debug
-
+		this.$logger.out("fyhao DEBUG buildPlatform 5 - 20170811"); // temp debug
 		this.$fs.writeJson(buildInfoFile, buildInfo);
 	}
 
