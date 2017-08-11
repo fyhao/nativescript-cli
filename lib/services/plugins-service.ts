@@ -71,7 +71,7 @@ export class PluginsService implements IPluginsService {
 
 			this.$logger.out(`Successfully installed plugin ${realNpmPackageJson.name}.`);
 		} else {
-			this.$npm.uninstall(realNpmPackageJson.name, { save: true }, projectData.projectDir);
+			await this.$npm.uninstall(realNpmPackageJson.name, { save: true }, projectData.projectDir);
 			this.$errors.failWithoutHelp(`${plugin} is not a valid NativeScript plugin. Verify that the plugin package.json file contains a nativescript key and try again.`);
 		}
 	}
@@ -107,14 +107,14 @@ export class PluginsService implements IPluginsService {
 		return await platformData.platformProjectService.validatePlugins(projectData);
 	}
 
-	public async prepare(dependencyData: IDependencyData, platform: string, projectData: IProjectData): Promise<void> {
+	public async prepare(dependencyData: IDependencyData, platform: string, projectData: IProjectData,  projectFilesConfig: IProjectFilesConfig): Promise<void> {
 		platform = platform.toLowerCase();
 		let platformData = this.$platformsData.getPlatformData(platform, projectData);
 		let pluginData = this.convertToPluginData(dependencyData, projectData.projectDir);
 
 		let appFolderExists = this.$fs.exists(path.join(platformData.appDestinationDirectoryPath, constants.APP_FOLDER_NAME));
 		if (appFolderExists) {
-			this.preparePluginScripts(pluginData, platform, projectData);
+			this.preparePluginScripts(pluginData, platform, projectData, projectFilesConfig);
 			await this.preparePluginNativeCode(pluginData, platform, projectData);
 
 			// Show message
@@ -122,7 +122,7 @@ export class PluginsService implements IPluginsService {
 		}
 	}
 
-	private preparePluginScripts(pluginData: IPluginData, platform: string, projectData: IProjectData): void {
+	public preparePluginScripts(pluginData: IPluginData, platform: string, projectData: IProjectData, projectFilesConfig: IProjectFilesConfig): void {
 		let platformData = this.$platformsData.getPlatformData(platform, projectData);
 		let pluginScriptsDestinationPath = path.join(platformData.appDestinationDirectoryPath, constants.APP_FOLDER_NAME, "tns_modules");
 		let scriptsDestinationExists = this.$fs.exists(pluginScriptsDestinationPath);
@@ -136,10 +136,10 @@ export class PluginsService implements IPluginsService {
 		}
 
 		//prepare platform speciffic files, .map and .ts files
-		this.$projectFilesManager.processPlatformSpecificFiles(pluginScriptsDestinationPath, platform);
+		this.$projectFilesManager.processPlatformSpecificFiles(pluginScriptsDestinationPath, platform, projectFilesConfig);
 	}
 
-	private async preparePluginNativeCode(pluginData: IPluginData, platform: string, projectData: IProjectData): Promise<void> {
+	public async preparePluginNativeCode(pluginData: IPluginData, platform: string, projectData: IProjectData): Promise<void> {
 		let platformData = this.$platformsData.getPlatformData(platform, projectData);
 
 		pluginData.pluginPlatformsFolderPath = (_platform: string) => path.join(pluginData.fullPath, "platforms", _platform);
@@ -228,7 +228,7 @@ export class PluginsService implements IPluginsService {
 		};
 	}
 
-	private convertToPluginData(cacheData: any, projectDir: string): IPluginData {
+	public convertToPluginData(cacheData: any, projectDir: string): IPluginData {
 		let pluginData: any = {};
 		pluginData.name = cacheData.name;
 		pluginData.version = cacheData.version;
@@ -280,7 +280,7 @@ export class PluginsService implements IPluginsService {
 				let pluginDestinationPath = path.join(platformData.appDestinationDirectoryPath, constants.APP_FOLDER_NAME, "tns_modules");
 				await action(pluginDestinationPath, platform.toLowerCase(), platformData);
 			}
-		};
+		}
 	}
 
 	private getInstalledFrameworkVersion(platform: string, projectData: IProjectData): string {

@@ -16,10 +16,19 @@ export const TEST_RUNNER_NAME = "nativescript-unit-test-runner";
 export const LIVESYNC_EXCLUDED_FILE_PATTERNS = ["**/*.js.map", "**/*.ts"];
 export const XML_FILE_EXTENSION = ".xml";
 export const PLATFORMS_DIR_NAME = "platforms";
+export const CODE_SIGN_ENTITLEMENTS = "CODE_SIGN_ENTITLEMENTS";
+export const AWAIT_NOTIFICATION_TIMEOUT_SECONDS = 9;
 
 export class PackageVersion {
 	static NEXT = "next";
 	static LATEST = "latest";
+}
+
+const liveSyncOperation = "LiveSync Operation";
+export class LiveSyncTrackActionNames {
+	static LIVESYNC_OPERATION = liveSyncOperation;
+	static LIVESYNC_OPERATION_BUILD = `${liveSyncOperation} - Build`;
+	static DEVICE_INFO = `Device Info for ${liveSyncOperation}`;
 }
 
 export const PackageJsonKeysToKeep: Array<String> = ["name", "main", "android", "version"];
@@ -65,9 +74,28 @@ class ItunesConnectApplicationTypesClass implements IiTunesConnectApplicationTyp
 }
 
 export const ItunesConnectApplicationTypes = new ItunesConnectApplicationTypesClass();
-
+export class LiveSyncPaths {
+	static SYNC_DIR_NAME = "sync";
+	static REMOVEDSYNC_DIR_NAME = "removedsync";
+	static FULLSYNC_DIR_NAME = "fullsync";
+	static IOS_DEVICE_PROJECT_ROOT_PATH = "Library/Application Support/LiveSync";
+	static IOS_DEVICE_SYNC_ZIP_PATH = "Library/Application Support/LiveSync/sync.zip";
+}
 export const ANGULAR_NAME = "angular";
 export const TYPESCRIPT_NAME = "typescript";
 export const BUILD_OUTPUT_EVENT_NAME = "buildOutput";
 export const CONNECTION_ERROR_EVENT_NAME = "connectionError";
 export const VERSION_STRING = "version";
+export const INSPECTOR_CACHE_DIRNAME = "ios-inspector";
+export const POST_INSTALL_COMMAND_NAME = "post-install-cli";
+
+export class DebugCommandErrors {
+	public static UNABLE_TO_USE_FOR_DEVICE_AND_EMULATOR = "The options --for-device and --emulator cannot be used simultaneously. Please use only one of them.";
+	public static NO_DEVICES_EMULATORS_FOUND_FOR_OPTIONS = "Unable to find device or emulator for specified options.";
+}
+
+export const enum NativePlatformStatus {
+	requiresPlatformAdd = "1",
+	requiresPrepare = "2",
+	alreadyPrepared = "3"
+}

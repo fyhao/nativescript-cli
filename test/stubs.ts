@@ -171,18 +171,18 @@ export class FileSystemStub implements IFileSystem {
 	deleteEmptyParents(directory: string): void { }
 
 	utimes(path: string, atime: Date, mtime: Date): void { }
+
+	realpath(filePath: string): string {
+		return null;
+	}
 }
 
 export class ErrorsStub implements IErrors {
-	constructor() {
-		new (require("../lib/common/errors").Errors)(); // we need the side effect of require'ing errors
-	}
-
 	fail(formatStr: string, ...args: any[]): void;
 	fail(opts: { formatStr?: string; errorCode?: number; suppressCommandHelp?: boolean }, ...args: any[]): void;
 
 	fail(...args: any[]) {
-		throw args;
+		throw new Error(require("util").format.apply(null, args || []));
 	}
 
 	failWithoutHelp(message: string, ...args: any[]): void {
@@ -206,7 +206,7 @@ export class ErrorsStub implements IErrors {
 }
 
 export class NpmInstallationManagerStub implements INpmInstallationManager {
-	async install(packageName: string, pathToSave?: string, version?: string): Promise<string> {
+	async install(packageName: string, pathToSave?: string, options?: INpmInstallOptions): Promise<string> {
 		return Promise.resolve("");
 	}
 
@@ -242,30 +242,6 @@ export class ProjectDataStub implements IProjectData {
 	projectType: string;
 	initializeProjectData(projectDir?: string): void {
 		this.projectDir = this.projectDir || projectDir;
-	}
-}
-
-export class PlatformsDataStub extends EventEmitter implements IPlatformsData {
-	public platformsNames: string[];
-
-	public getPlatformData(platform: string, projectData: IProjectData): IPlatformData {
-		return {
-			frameworkPackageName: "",
-			platformProjectService: new PlatformProjectServiceStub(),
-			emulatorServices: undefined,
-			projectRoot: "",
-			normalizedPlatformName: "",
-			appDestinationDirectoryPath: "",
-			deviceBuildOutputPath: "",
-			getValidPackageNames: (buildOptions: { isForDevice?: boolean, isReleaseBuild?: boolean }) => [],
-			frameworkFilesExtensions: [],
-			relativeToFrameworkConfigurationFilePath: "",
-			fastLivesyncFileExtensions: []
-		};
-	}
-
-	public get availablePlatforms(): any {
-		return undefined;
 	}
 }
 
@@ -362,6 +338,30 @@ export class PlatformProjectServiceStub extends EventEmitter implements IPlatfor
 	}
 }
 
+export class PlatformsDataStub extends EventEmitter implements IPlatformsData {
+	public platformsNames: string[];
+
+	public getPlatformData(platform: string, projectData: IProjectData): IPlatformData {
+		return {
+			frameworkPackageName: "",
+			platformProjectService: new PlatformProjectServiceStub(),
+			emulatorServices: undefined,
+			projectRoot: "",
+			normalizedPlatformName: "",
+			appDestinationDirectoryPath: "",
+			deviceBuildOutputPath: "",
+			getValidPackageNames: (buildOptions: { isForDevice?: boolean, isReleaseBuild?: boolean }) => [],
+			frameworkFilesExtensions: [],
+			relativeToFrameworkConfigurationFilePath: "",
+			fastLivesyncFileExtensions: []
+		};
+	}
+
+	public get availablePlatforms(): any {
+		return undefined;
+	}
+}
+
 export class ProjectDataService implements IProjectDataService {
 	getNSValue(propertyName: string): any {
 		return {};
@@ -372,6 +372,8 @@ export class ProjectDataService implements IProjectDataService {
 	removeNSProperty(propertyName: string): void { }
 
 	removeDependency(dependencyName: string): void { }
+
+	getProjectData(projectDir: string): IProjectData { return null; }
 }
 
 export class ProjectHelperStub implements IProjectHelper {
@@ -475,7 +477,7 @@ function unexpected(msg: string): Error {
 }
 
 export class DebugServiceStub extends EventEmitter implements IPlatformDebugService {
-	public async debug(): Promise<string[]> {
+	public async debug(): Promise<string> {
 		return;
 	}
 
@@ -491,7 +493,11 @@ export class DebugServiceStub extends EventEmitter implements IPlatformDebugServ
 }
 
 export class LiveSyncServiceStub implements ILiveSyncService {
-	public async liveSync(platform: string, projectData: IProjectData, applicationReloadAction?: (deviceAppData: Mobile.IDeviceAppData) => Promise<void>): Promise<void> {
+	public async liveSync(deviceDescriptors: ILiveSyncDeviceInfo[], liveSyncData: ILiveSyncInfo): Promise<void> {
+		return;
+	}
+
+	public async stopLiveSync(projectDir: string): Promise<void> {
 		return;
 	}
 }
@@ -499,7 +505,7 @@ export class LiveSyncServiceStub implements ILiveSyncService {
 export class AndroidToolsInfoStub implements IAndroidToolsInfo {
 	public getToolsInfo(): IAndroidToolsInfoData {
 		let infoData: IAndroidToolsInfoData = Object.create(null);
-		infoData.androidHomeEnvVar = "";
+		infoData.androidHomeEnvVar = "ANDROID_HOME";
 		infoData.compileSdkVersion = 23;
 		infoData.buildToolsVersion = "23";
 		infoData.targetSdkVersion = 23;
@@ -568,6 +574,10 @@ export class ProjectChangesService implements IProjectChangesService {
 	public get currentChanges(): IProjectChangesInfo {
 		return <IProjectChangesInfo>{};
 	}
+
+	public setNativePlatformStatus(platform: string, projectData: IProjectData, nativePlatformStatus: IAddedNativePlatform): void {
+		return;
+	}
 }
 
 export class CommandsService implements ICommandsService {
@@ -613,6 +623,10 @@ export class PlatformServiceStub extends EventEmitter implements IPlatformServic
 		return [];
 	}
 
+	public saveBuildInfoFile(platform: string, projectDir: string, buildInfoFileDirname: string): void {
+		return;
+	}
+
 	public async removePlatforms(platforms: string[]): Promise<void> {
 
 	}
@@ -649,10 +663,6 @@ export class PlatformServiceStub extends EventEmitter implements IPlatformServic
 		return Promise.resolve();
 	}
 
-	public emulatePlatform(platform: string, appFilesUpdaterOptions: IAppFilesUpdaterOptions, emulateOptions: IEmulatePlatformOptions): Promise<void> {
-		return Promise.resolve();
-	}
-
 	public cleanDestinationApp(platform: string, appFilesUpdaterOptions: IAppFilesUpdaterOptions, platformTemplate: string): Promise<void> {
 		return Promise.resolve();
 	}
@@ -663,6 +673,10 @@ export class PlatformServiceStub extends EventEmitter implements IPlatformServic
 
 	public validatePlatform(platform: string): void {
 
+	}
+
+	isPlatformSupportedForOS(platform: string, projectData: IProjectData): boolean {
+		return true;
 	}
 
 	public getLatestApplicationPackageForDevice(platformData: IPlatformData): IApplicationPackage {

@@ -83,26 +83,30 @@ interface IDebugDataService {
 	 * @param {IOptions} options The options based on which debugData will be created
 	 * @returns {IDebugData} Data describing the required information for starting debug process.
 	 */
-	createDebugData(projectData: IProjectData, options: IOptions): IDebugData;
+	createDebugData(projectData: IProjectData, options: IDeviceIdentifier): IDebugData;
 }
 
 /**
  * Describes methods for debug operation.
  */
-interface IDebugService extends NodeJS.EventEmitter {
+interface IDebugServiceBase extends NodeJS.EventEmitter {
 	/**
 	 * Starts debug operation based on the specified debug data.
 	 * @param {IDebugData} debugData Describes information for device and application that will be debugged.
 	 * @param {IDebugOptions} debugOptions Describe possible options to modify the behaivor of the debug operation, for example stop on the first line.
 	 * @returns {Promise<T>} Array of URLs that can be used for debugging or a string representing a single url that can be used for debugging.
 	 */
-	debug<T>(debugData: IDebugData, debugOptions: IDebugOptions): Promise<T>;
+	debug(debugData: IDebugData, debugOptions: IDebugOptions): Promise<string>;
+}
+
+interface IDebugService {
+	getDebugService(device: Mobile.IDevice): IPlatformDebugService;
 }
 
 /**
  * Describes actions required for debugging on specific platform (Android or iOS).
  */
-interface IPlatformDebugService extends IDebugService {
+interface IPlatformDebugService extends IDebugServiceBase {
 	/**
 	 * Starts debug operation.
 	 * @param {IDebugData} debugData Describes information for device and application that will be debugged.

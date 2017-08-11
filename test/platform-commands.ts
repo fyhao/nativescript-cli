@@ -15,7 +15,6 @@ import { DeviceAppDataFactory } from "../lib/common/mobile/device-app-data/devic
 import { LocalToDevicePathDataFactory } from "../lib/common/mobile/local-to-device-path-data-factory";
 import { MobileHelper } from "../lib/common/mobile/mobile-helper";
 import { ProjectFilesProvider } from "../lib/providers/project-files-provider";
-import { DeviceAppDataProvider } from "../lib/providers/device-app-data-provider";
 import { MobilePlatformsCapabilities } from "../lib/mobile-platforms-capabilities";
 import { DevicePlatformsConstants } from "../lib/common/mobile/device-platforms-constants";
 import { XmlValidator } from "../lib/xml-validator";
@@ -28,11 +27,15 @@ let isCommandExecuted = true;
 class PlatformData implements IPlatformData {
 	frameworkPackageName = "tns-android";
 	normalizedPlatformName = "Android";
-	platformProjectService: IPlatformProjectService = null;
+	platformProjectService: IPlatformProjectService = <any>{
+		validate: async (projectData: IProjectData): Promise<void> => {
+			// intentionally left blank
+		}
+	};
 	emulatorServices: Mobile.IEmulatorPlatformServices = null;
 	projectRoot = "";
 	deviceBuildOutputPath = "";
-	getValidPackageNames = (buildOptions: {isForDevice?: boolean, isReleaseBuild?: boolean}) => [""];
+	getValidPackageNames = (buildOptions: { isForDevice?: boolean, isReleaseBuild?: boolean }) => [""];
 	validPackageNamesForDevice: string[] = [];
 	frameworkFilesExtensions = [".jar", ".dat"];
 	appDestinationDirectoryPath = "";
@@ -93,6 +96,7 @@ function createTestInjector() {
 	testInjector.register("injector", testInjector);
 	testInjector.register("hooksService", stubs.HooksServiceStub);
 	testInjector.register("staticConfig", StaticConfigLib.StaticConfig);
+	testInjector.register("nodeModulesDependenciesBuilder", {});
 	testInjector.register('platformService', PlatformServiceLib.PlatformService);
 	testInjector.register('errors', ErrorsNoFailStub);
 	testInjector.register('logger', stubs.LoggerStub);
@@ -122,7 +126,7 @@ function createTestInjector() {
 		prepareNodeModulesFolder: () => { /* intentionally left blank */ }
 	});
 	testInjector.register("pluginsService", {
-		getAllInstalledPlugins: async () => []
+		getAllInstalledPlugins: async (): Promise<any[]> => []
 	});
 	testInjector.register("projectFilesManager", ProjectFilesManagerLib.ProjectFilesManager);
 	testInjector.register("hooksService", stubs.HooksServiceStub);
@@ -131,7 +135,6 @@ function createTestInjector() {
 	testInjector.register("localToDevicePathDataFactory", LocalToDevicePathDataFactory);
 	testInjector.register("mobileHelper", MobileHelper);
 	testInjector.register("projectFilesProvider", ProjectFilesProvider);
-	testInjector.register("deviceAppDataProvider", DeviceAppDataProvider);
 	testInjector.register("mobilePlatformsCapabilities", MobilePlatformsCapabilities);
 	testInjector.register("devicePlatformsConstants", DevicePlatformsConstants);
 	testInjector.register("xmlValidator", XmlValidator);
@@ -140,9 +143,10 @@ function createTestInjector() {
 	testInjector.register("projectChangesService", ProjectChangesLib.ProjectChangesService);
 	testInjector.register("emulatorPlatformService", stubs.EmulatorPlatformService);
 	testInjector.register("analyticsService", {
-		track: async () => undefined
+		track: async () => async (): Promise<any[]> => undefined
 	});
 	testInjector.register("messages", Messages);
+	testInjector.register("devicePathProvider", {});
 
 	return testInjector;
 }

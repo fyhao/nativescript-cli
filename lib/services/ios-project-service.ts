@@ -6,11 +6,15 @@ import * as constants from "../constants";
 import * as helpers from "../common/helpers";
 import { attachAwaitDetach } from "../common/helpers";
 import * as projectServiceBaseLib from "./platform-project-service-base";
-import { PlistSession } from "plist-merge-patch";
+import { PlistSession, Reporter } from "plist-merge-patch";
 import { EOL } from "os";
 import * as temp from "temp";
 import * as plist from "plist";
 import { IOSProvisionService } from "./ios-provision-service";
+import { IOSEntitlementsService } from "./ios-entitlements-service";
+import { XCConfigService } from "./xcconfig-service";
+import * as simplePlist from "simple-plist";
+import * as mobileprovision from "ios-mobileprovision-finder";
 
 export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServiceBase implements IPlatformProjectService {
 	private static XCODE_PROJECT_EXT_NAME = ".xcodeproj";
@@ -37,12 +41,15 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 		private $devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
 		private $devicesService: Mobile.IDevicesService,
 		private $mobileHelper: Mobile.IMobileHelper,
+		private $hostInfo: IHostInfo,
 		private $pluginVariablesService: IPluginVariablesService,
 		private $xcprojService: IXcprojService,
 		private $iOSProvisionService: IOSProvisionService,
-		private $sysInfo: ISysInfo,
 		private $pbxprojDomXcode: IPbxprojDomXcode,
-		private $xcode: IXcode) {
+		private $xcode: IXcode,
+		private $iOSEntitlementsService: IOSEntitlementsService,
+		private $sysInfo: ISysInfo,
+		private $xCConfigService: XCConfigService) {
 		super($fs, $projectDataService);
 	}
 
@@ -67,10 +74,10 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 				emulatorBuildOutputPath: path.join(projectRoot, "build", "emulator"),
 				getValidPackageNames: (buildOptions: { isReleaseBuild?: boolean, isForDevice?: boolean }): string[] => {
 					if (buildOptions.isForDevice) {
-						return [projectData.projectName + ".ipa"];
+						return [`${projectData.projectName}.ipa`];
 					}
 
-					return [projectData.projectName + ".app"];
+					return [`${projectData.projectName}.app`, `${projectData.projectName}.zip`];
 				},
 				frameworkFilesExtensions: [".a", ".framework", ".bin"],
 				frameworkDirectoriesExtensions: [".framework"],
@@ -107,6 +114,10 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	}
 
 	public async validate(): Promise<void> {
+		if (!this.$hostInfo.isDarwin) {
+			return;
+		}
+
 		try {
 			await this.$childProcess.exec("which xcodebuild");
 		} catch (error) {
@@ -323,6 +334,8 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 				handler,
 				this.buildForSimulator(projectRoot, basicArgs, projectData, buildConfig.buildOutputStdio));
 		}
+
+		this.validateApplicationIdentifier(projectData);
 	}
 
 	public async validatePlugins(projectData: IProjectData): Promise<void> {
@@ -345,7 +358,10 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 		this.$logger.out("fyhao DEBUG buildForDevice 1"); // temp debug
 		// build only for device specific architecture
 		if (!buildConfig.release && !buildConfig.architectures) {
-			await this.$devicesService.initialize({ platform: this.$devicePlatformsConstants.iOS.toLowerCase(), deviceId: buildConfig.device });
+			await this.$devicesService.initialize({
+				platform: this.$devicePlatformsConstants.iOS.toLowerCase(), deviceId: buildConfig.device,
+				skipEmulatorStart: true
+			});
 			let instances = this.$devicesService.getDeviceInstances();
 			let devicesArchitectures = _(instances)
 				.filter(d => this.$mobileHelper.isiOSPlatform(d.deviceInfo.platform) && d.deviceInfo.activeArchitecture)
@@ -414,7 +430,7 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 		await this.createIpa(projectRoot, projectData, buildConfig);
 	}
 
-	private async setupSigningFromProvision(projectRoot: string, projectData: IProjectData, provision?: string): Promise<void> {
+	private async setupSigningFromProvision(projectRoot: string, projectData: IProjectData, provision?: string, mobileProvisionData?: mobileprovision.provision.MobileProvision): Promise<void> {
 		if (provision) {
 			const xcode = this.$pbxprojDomXcode.Xcode.open(this.getPbxProjPath(projectData));
 			const signing = xcode.getSigning(projectData.projectName);
@@ -434,7 +450,7 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 
 			if (shouldUpdateXcode) {
 				const pickStart = Date.now();
-				const mobileprovision = await this.$iOSProvisionService.pick(provision, projectData.projectId);
+				const mobileprovision = mobileProvisionData || await this.$iOSProvisionService.pick(provision, projectData.projectId);
 				const pickEnd = Date.now();
 				this.$logger.trace("Searched and " + (mobileprovision ? "found" : "failed to find ") + " matching provisioning profile. (" + (pickEnd - pickStart) + "ms.)");
 				if (!mobileprovision) {
@@ -533,23 +549,23 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 	}
 
 	private async addFramework(frameworkPath: string, projectData: IProjectData): Promise<void> {
-		await this.validateFramework(frameworkPath);
+		if (!this.$hostInfo.isWindows) {
+			this.validateFramework(frameworkPath);
 
-		let project = this.createPbxProj(projectData);
-		let frameworkName = path.basename(frameworkPath, path.extname(frameworkPath));
-		let frameworkBinaryPath = path.join(frameworkPath, frameworkName);
-		let isDynamic = _.includes((await this.$childProcess.spawnFromEvent("otool", ["-Vh", frameworkBinaryPath], "close")).stdout, " DYLIB ");
+			let project = this.createPbxProj(projectData);
+			let frameworkName = path.basename(frameworkPath, path.extname(frameworkPath));
+			let frameworkBinaryPath = path.join(frameworkPath, frameworkName);
+			let isDynamic = _.includes((await this.$childProcess.spawnFromEvent("file", [frameworkBinaryPath], "close")).stdout, "dynamically linked");
+			let frameworkAddOptions: IXcode.Options = { customFramework: true };
 
-		let frameworkAddOptions: IXcode.Options = { customFramework: true };
+			if (isDynamic) {
+				frameworkAddOptions["embed"] = true;
+			}
 
-		if (isDynamic) {
-			frameworkAddOptions["embed"] = true;
+			let frameworkRelativePath = '$(SRCROOT)/' + this.getLibSubpathRelativeToProjectPath(frameworkPath, projectData);
+			project.addFramework(frameworkRelativePath, frameworkAddOptions);
+			this.savePbxProj(project, projectData);
 		}
-
-		let frameworkRelativePath = '$(SRCROOT)/' + this.getLibSubpathRelativeToProjectPath(frameworkPath, projectData);
-		project.addFramework(frameworkRelativePath, frameworkAddOptions);
-		this.savePbxProj(project, projectData);
-
 	}
 
 	private async addStaticLibrary(staticLibPath: string, projectData: IProjectData): Promise<void> {
@@ -673,7 +689,7 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 
 		if (provision) {
 			let projectRoot = path.join(projectData.platformsDir, "ios");
-			await this.setupSigningFromProvision(projectRoot, projectData, provision);
+			await this.setupSigningFromProvision(projectRoot, projectData, provision, platformSpecificData.mobileProvisionData);
 		}
 
 		let project = this.createPbxProj(projectData);
@@ -715,7 +731,8 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 	}
 
 	public async processConfigurationFilesFromAppResources(release: boolean, projectData: IProjectData): Promise<void> {
-		await this.mergeInfoPlists(projectData);
+		await this.mergeInfoPlists({ release }, projectData);
+		await this.$iOSEntitlementsService.merge(projectData);
 		await this.mergeProjectXcconfigFiles(release, projectData);
 		for (let pluginData of await this.getAllInstalledPlugins(projectData)) {
 			await this.$pluginVariablesService.interpolatePluginVariables(pluginData, this.getPlatformData(projectData).configurationFilePath, projectData);
@@ -746,7 +763,7 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 		return Promise.resolve();
 	}
 
-	private async mergeInfoPlists(projectData: IProjectData): Promise<void> {
+	private async mergeInfoPlists(buildOptions: IRelease, projectData: IProjectData): Promise<void> {
 		let projectDir = projectData.projectDir;
 		let infoPlistPath = path.join(projectDir, constants.APP_FOLDER_NAME, constants.APP_RESOURCES_FOLDER_NAME, this.getPlatformData(projectData).normalizedPlatformName, this.getPlatformData(projectData).configurationFileName);
 		this.ensureConfigurationFileInAppResources();
@@ -756,7 +773,13 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 			return;
 		}
 
-		let session = new PlistSession({ log: (txt: string) => this.$logger.trace("Info.plist: " + txt) });
+		const reporterTraceMessage = "Info.plist:";
+		const reporter: Reporter = {
+			log: (txt: string) => this.$logger.trace(`${reporterTraceMessage} ${txt}`),
+			warn: (txt: string) => this.$logger.warn(`${reporterTraceMessage} ${txt}`)
+		};
+
+		let session = new PlistSession(reporter);
 		let makePatch = (plistPath: string) => {
 			if (!this.$fs.exists(plistPath)) {
 				this.$logger.trace("No plist found at: " + plistPath);
@@ -787,7 +810,31 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 						<plist version="1.0">
 						<dict>
 							<key>CFBundleIdentifier</key>
-							<string>${ projectData.projectId}</string>
+							<string>${projectData.projectId}</string>
+						</dict>
+						</plist>`
+			});
+		}
+
+		if (!buildOptions.release && projectData.projectId) {
+			session.patch({
+				name: "CFBundleURLTypes from package.json nativescript.id",
+				read: () =>
+					`<?xml version="1.0" encoding="UTF-8"?>
+						<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+						<plist version="1.0">
+						<dict>
+							<key>CFBundleURLTypes</key>
+							<array>
+								<dict>
+									<key>CFBundleTypeRole</key>
+									<string>Editor</string>
+									<key>CFBundleURLSchemes</key>
+									<array>
+										<string>${projectData.projectId.replace(/[^A-Za-z0-9]/g, "")}</string>
+									</array>
+								</dict>
+							</array>
 						</dict>
 						</plist>`
 			});
@@ -879,7 +926,6 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 
 			if (!this.$fs.exists(xcuserDataPath) && !this.$fs.exists(sharedDataPath)) {
 				this.$logger.info("Creating project scheme...");
-
 				await this.checkIfXcodeprojIsRequired();
 
 				let createSchemeRubyScript = `ruby -e "require 'xcodeproj'; xcproj = Xcodeproj::Project.open('${projectData.projectName}.xcodeproj'); xcproj.recreate_user_schemes; xcproj.save"`;
@@ -926,7 +972,7 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 	private getAllLibsForPluginWithFileExtension(pluginData: IPluginData, fileExtension: string): string[] {
 		let filterCallback = (fileName: string, pluginPlatformsFolderPath: string) => path.extname(fileName) === fileExtension;
 		return this.getAllNativeLibrariesForPlugin(pluginData, IOSProjectService.IOS_PLATFORM_NAME, filterCallback);
-	};
+	}
 
 	private buildPathToCurrentXcodeProjectFile(projectData: IProjectData): string {
 		return path.join(projectData.platformsDir, "ios", `${projectData.projectName}.xcodeproj`, "project.pbxproj");
@@ -936,17 +982,18 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 		return path.join(newModulesDir, constants.PROJECT_FRAMEWORK_FOLDER_NAME, `${IOSProjectService.IOS_PROJECT_NAME_PLACEHOLDER}.xcodeproj`, "project.pbxproj");
 	}
 
-	private async validateFramework(libraryPath: string): Promise<void> {
-		let infoPlistPath = path.join(libraryPath, "Info.plist");
+	private validateFramework(libraryPath: string): void {
+		const infoPlistPath = path.join(libraryPath, "Info.plist");
 		if (!this.$fs.exists(infoPlistPath)) {
 			this.$errors.failWithoutHelp("The bundle at %s does not contain an Info.plist file.", libraryPath);
 		}
 
-		let packageType = (await this.$childProcess.spawnFromEvent("/usr/libexec/PlistBuddy", ["-c", "Print :CFBundlePackageType", infoPlistPath], "close")).stdout.trim();
+		const plistJson = simplePlist.readFileSync(infoPlistPath);
+		const packageType = plistJson["CFBundlePackageType"];
+
 		if (packageType !== "FMWK") {
 			this.$errors.failWithoutHelp("The bundle at %s does not appear to be a dynamic framework.", libraryPath);
 		}
-
 	}
 
 	private async validateStaticLibrary(libraryPath: string): Promise<void> {
@@ -1133,20 +1180,33 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 	}
 
 	private async mergeProjectXcconfigFiles(release: boolean, projectData: IProjectData): Promise<void> {
-		this.$fs.deleteFile(release ? this.getPluginsReleaseXcconfigFilePath(projectData) : this.getPluginsDebugXcconfigFilePath(projectData));
+		let pluginsXcconfigFilePath = release ? this.getPluginsReleaseXcconfigFilePath(projectData) : this.getPluginsDebugXcconfigFilePath(projectData);
+		this.$fs.deleteFile(pluginsXcconfigFilePath);
 
 		let allPlugins: IPluginData[] = await (<IPluginsService>this.$injector.resolve("pluginsService")).getAllInstalledPlugins(projectData);
 		for (let plugin of allPlugins) {
 			let pluginPlatformsFolderPath = plugin.pluginPlatformsFolderPath(IOSProjectService.IOS_PLATFORM_NAME);
 			let pluginXcconfigFilePath = path.join(pluginPlatformsFolderPath, "build.xcconfig");
 			if (this.$fs.exists(pluginXcconfigFilePath)) {
-				await this.mergeXcconfigFiles(pluginXcconfigFilePath, release ? this.getPluginsReleaseXcconfigFilePath(projectData) : this.getPluginsDebugXcconfigFilePath(projectData));
+				await this.mergeXcconfigFiles(pluginXcconfigFilePath, pluginsXcconfigFilePath);
 			}
 		}
 
 		let appResourcesXcconfigPath = path.join(projectData.projectDir, constants.APP_FOLDER_NAME, constants.APP_RESOURCES_FOLDER_NAME, this.getPlatformData(projectData).normalizedPlatformName, "build.xcconfig");
 		if (this.$fs.exists(appResourcesXcconfigPath)) {
-			await this.mergeXcconfigFiles(appResourcesXcconfigPath, release ? this.getPluginsReleaseXcconfigFilePath(projectData) : this.getPluginsDebugXcconfigFilePath(projectData));
+			await this.mergeXcconfigFiles(appResourcesXcconfigPath, pluginsXcconfigFilePath);
+		}
+
+		// Set Entitlements Property to point to default file if not set explicitly by the user.
+		let entitlementsPropertyValue = this.$xCConfigService.readPropertyValue(pluginsXcconfigFilePath, constants.CODE_SIGN_ENTITLEMENTS);
+		if (entitlementsPropertyValue === null) {
+			temp.track();
+			const tempEntitlementsDir = temp.mkdirSync("entitlements");
+			const tempEntitlementsFilePath = path.join(tempEntitlementsDir, "set-entitlements.xcconfig");
+			const entitlementsRelativePath = this.$iOSEntitlementsService.getPlatformsEntitlementsRelativePath(projectData);
+			this.$fs.writeFile(tempEntitlementsFilePath, `CODE_SIGN_ENTITLEMENTS = ${entitlementsRelativePath}${EOL}`);
+
+			await this.mergeXcconfigFiles(tempEntitlementsFilePath, pluginsXcconfigFilePath);
 		}
 
 		let podFilesRootDirName = path.join("Pods", "Target Support Files", `Pods-${projectData.projectName}`);
@@ -1226,51 +1286,37 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 		return null;
 	}
 
-	private readXCConfig(flag: string, projectData: IProjectData): string {
-		let xcconfigFile = path.join(projectData.appResourcesDirectoryPath, this.getPlatformData(projectData).normalizedPlatformName, "build.xcconfig");
-		if (this.$fs.exists(xcconfigFile)) {
-			let text = this.$fs.readText(xcconfigFile);
-			let teamId: string;
-			text.split(/\r?\n/).forEach((line) => {
-				line = line.replace(/\/(\/)[^\n]*$/, "");
-				if (line.indexOf(flag) >= 0) {
-					teamId = line.split("=")[1].trim();
-					if (teamId[teamId.length - 1] === ';') {
-						teamId = teamId.slice(0, -1);
-					}
-				}
-			});
-			if (teamId) {
-				return teamId;
-			}
-		}
-
-		let fileName = path.join(this.getPlatformData(projectData).projectRoot, "teamid");
-		if (this.$fs.exists(fileName)) {
-			return this.$fs.readText(fileName);
-		}
-
-		return null;
+	private getBuildXCConfigFilePath(projectData: IProjectData): string {
+		let buildXCConfig = path.join(projectData.appResourcesDirectoryPath,
+			this.getPlatformData(projectData).normalizedPlatformName, "build.xcconfig");
+		return buildXCConfig;
 	}
 
 	private readTeamId(projectData: IProjectData): string {
-		return this.readXCConfig("DEVELOPMENT_TEAM", projectData);
+		let teamId = this.$xCConfigService.readPropertyValue(this.getBuildXCConfigFilePath(projectData), "DEVELOPMENT_TEAM");
+
+		let fileName = path.join(this.getPlatformData(projectData).projectRoot, "teamid");
+		if (this.$fs.exists(fileName)) {
+			teamId = this.$fs.readText(fileName);
+		}
+
+		return teamId;
 	}
 
 	private readXCConfigProvisioningProfile(projectData: IProjectData): string {
-		return this.readXCConfig("PROVISIONING_PROFILE", projectData);
+		return this.$xCConfigService.readPropertyValue(this.getBuildXCConfigFilePath(projectData), "PROVISIONING_PROFILE");
 	}
 
 	private readXCConfigProvisioningProfileForIPhoneOs(projectData: IProjectData): string {
-		return this.readXCConfig("PROVISIONING_PROFILE[sdk=iphoneos*]", projectData);
+		return this.$xCConfigService.readPropertyValue(this.getBuildXCConfigFilePath(projectData), "PROVISIONING_PROFILE[sdk=iphoneos*]");
 	}
 
 	private readXCConfigProvisioningProfileSpecifier(projectData: IProjectData): string {
-		return this.readXCConfig("PROVISIONING_PROFILE_SPECIFIER", projectData);
+		return this.$xCConfigService.readPropertyValue(this.getBuildXCConfigFilePath(projectData), "PROVISIONING_PROFILE_SPECIFIER");
 	}
 
 	private readXCConfigProvisioningProfileSpecifierForIPhoneOs(projectData: IProjectData): string {
-		return this.readXCConfig("PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]", projectData);
+		return this.$xCConfigService.readPropertyValue(this.getBuildXCConfigFilePath(projectData), "PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]");
 	}
 
 	private async getDevelopmentTeam(projectData: IProjectData, teamId?: string): Promise<string> {
@@ -1315,6 +1361,23 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 			}
 		}
 		return teamId;
+	}
+
+	private validateApplicationIdentifier(projectData: IProjectData): void {
+		const projectDir = projectData.projectDir;
+		const infoPlistPath = path.join(projectDir, constants.APP_FOLDER_NAME, constants.APP_RESOURCES_FOLDER_NAME, this.getPlatformData(projectData).normalizedPlatformName, this.getPlatformData(projectData).configurationFileName);
+		const mergedPlistPath =  this.getPlatformData(projectData).configurationFilePath;
+
+		if (!this.$fs.exists(infoPlistPath) || !this.$fs.exists(mergedPlistPath)) {
+			return;
+		}
+
+		const infoPlist = plist.parse(this.$fs.readText(infoPlistPath));
+		const mergedPlist = plist.parse(this.$fs.readText(mergedPlistPath));
+
+		if (infoPlist.CFBundleIdentifier && infoPlist.CFBundleIdentifier !== mergedPlist.CFBundleIdentifier) {
+			this.$logger.warnWithLabel("The CFBundleIdentifier key inside the 'Info.plist' will be overriden by the 'id' inside 'package.json'.");
+		}
 	}
 }
 

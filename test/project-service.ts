@@ -29,6 +29,29 @@ let originalIsInteractive = helpers.isInteractive;
 
 temp.track();
 
+async function prepareTestingPath(testInjector: IInjector, packageToInstall: string, packageName: string, options?: INpmInstallOptions): Promise<string> {
+	options = options || { dependencyType: "save" };
+	const fs = testInjector.resolve<IFileSystem>("fs");
+
+	let npmInstallationManager = testInjector.resolve<INpmInstallationManager>("npmInstallationManager");
+	let defaultTemplateDir = temp.mkdirSync("project-service");
+	fs.writeJson(path.join(defaultTemplateDir, constants.PACKAGE_JSON_FILE_NAME), {
+		"name": "defaultTemplate",
+		"version": "1.0.0",
+		"description": "dummy",
+		"license": "MIT",
+		"readme": "dummy",
+		"repository": "dummy"
+	});
+
+	await npmInstallationManager.install(packageToInstall, defaultTemplateDir, options);
+	const defaultTemplatePath = path.join(defaultTemplateDir, constants.NODE_MODULES_FOLDER_NAME, packageName);
+
+	fs.deleteDirectory(path.join(defaultTemplatePath, constants.NODE_MODULES_FOLDER_NAME));
+
+	return defaultTemplatePath;
+}
+
 class ProjectIntegrationTest {
 	public testInjector: IInjector;
 
@@ -114,7 +137,7 @@ class ProjectIntegrationTest {
 		this.testInjector.register("fs", FileSystem);
 		this.testInjector.register("projectDataService", ProjectDataServiceLib.ProjectDataService);
 		this.testInjector.register("staticConfig", StaticConfig);
-		this.testInjector.register("analyticsService", { track: async () => undefined });
+		this.testInjector.register("analyticsService", { track: async (): Promise<any> => undefined });
 
 		this.testInjector.register("npmInstallationManager", NpmInstallationManager);
 		this.testInjector.register("npm", NpmLib.NodePackageManager);
@@ -130,6 +153,7 @@ class ProjectIntegrationTest {
 				return dummyString;
 			}
 		});
+		this.testInjector.register("npmInstallationManager", NpmInstallationManager);
 	}
 }
 
@@ -145,85 +169,12 @@ describe("Project Service Tests", () => {
 
 		before(async () => {
 			let projectIntegrationTest = new ProjectIntegrationTest();
-			let fs: IFileSystem = projectIntegrationTest.testInjector.resolve("fs");
-			let npmInstallationManager: INpmInstallationManager = projectIntegrationTest.testInjector.resolve("npmInstallationManager");
 
-			let defaultTemplateDir = temp.mkdirSync("defaultTemplate");
-			fs.writeJson(path.join(defaultTemplateDir, "package.json"), {
-				"name": "defaultTemplate",
-				"version": "1.0.0",
-				"description": "dummy",
-				"license": "MIT",
-				"readme": "dummy",
-				"repository": "dummy"
-			});
-
-			await npmInstallationManager.install(constants.RESERVED_TEMPLATE_NAMES["default"], defaultTemplateDir, { dependencyType: "save" });
-			defaultTemplatePath = path.join(defaultTemplateDir, "node_modules", constants.RESERVED_TEMPLATE_NAMES["default"]);
-
-			fs.deleteDirectory(path.join(defaultTemplatePath, "node_modules"));
-
-			let defaultSpecificVersionTemplateDir = temp.mkdirSync("defaultTemplateSpeciffic");
-			fs.writeJson(path.join(defaultSpecificVersionTemplateDir, "package.json"), {
-				"name": "defaultTemplateSpecialVersion",
-				"version": "1.0.0",
-				"description": "dummy",
-				"license": "MIT",
-				"readme": "dummy",
-				"repository": "dummy"
-			});
-
-			await npmInstallationManager.install(constants.RESERVED_TEMPLATE_NAMES["default"], defaultSpecificVersionTemplateDir, { version: "1.4.0", dependencyType: "save" });
-			defaultSpecificVersionTemplatePath = path.join(defaultSpecificVersionTemplateDir, "node_modules", constants.RESERVED_TEMPLATE_NAMES["default"]);
-
-			fs.deleteDirectory(path.join(defaultSpecificVersionTemplatePath, "node_modules"));
-
-			let angularTemplateDir = temp.mkdirSync("angularTemplate");
-			fs.writeJson(path.join(angularTemplateDir, "package.json"), {
-				"name": "angularTemplate",
-				"version": "1.0.0",
-				"description": "dummy",
-				"license": "MIT",
-				"readme": "dummy",
-				"repository": "dummy"
-			});
-
-			await npmInstallationManager.install(constants.RESERVED_TEMPLATE_NAMES["angular"], angularTemplateDir, { dependencyType: "save" });
-			angularTemplatePath = path.join(angularTemplateDir, "node_modules", constants.RESERVED_TEMPLATE_NAMES["angular"]);
-
-			fs.deleteDirectory(path.join(angularTemplatePath, "node_modules"));
-
-			let typescriptTemplateDir = temp.mkdirSync("typescriptTemplate");
-			fs.writeJson(path.join(typescriptTemplateDir, "package.json"), {
-				"name": "typescriptTemplate",
-				"version": "1.0.0",
-				"description": "dummy",
-				"license": "MIT",
-				"readme": "dummy",
-				"repository": "dummy"
-			});
-
-			await npmInstallationManager.install(constants.RESERVED_TEMPLATE_NAMES["typescript"], typescriptTemplateDir, { dependencyType: "save" });
-			typescriptTemplatePath = path.join(typescriptTemplateDir, "node_modules", constants.RESERVED_TEMPLATE_NAMES["typescript"]);
-
-			fs.deleteDirectory(path.join(typescriptTemplatePath, "node_modules"));
-			let noAppResourcesTemplateDir = temp.mkdirSync("noAppResources");
-			fs.writeJson(path.join(noAppResourcesTemplateDir, "package.json"), {
-				"name": "blankTemplate",
-				"version": "1.0.0",
-				"description": "dummy",
-				"license": "MIT",
-				"readme": "dummy",
-				"repository": "dummy"
-			});
-
-			await npmInstallationManager.install(noAppResourcesTemplateName, noAppResourcesTemplateDir, {
-				dependencyType: "save",
-				version: "2.0.0"
-			});
-			noAppResourcesTemplatePath = path.join(noAppResourcesTemplateDir, "node_modules", noAppResourcesTemplateName);
-
-			fs.deleteDirectory(path.join(noAppResourcesTemplatePath, "node_modules"));
+			defaultTemplatePath = await prepareTestingPath(projectIntegrationTest.testInjector, constants.RESERVED_TEMPLATE_NAMES["default"], constants.RESERVED_TEMPLATE_NAMES["default"]);
+			defaultSpecificVersionTemplatePath = await prepareTestingPath(projectIntegrationTest.testInjector, constants.RESERVED_TEMPLATE_NAMES["default"], constants.RESERVED_TEMPLATE_NAMES["default"], { version: "1.4.0", dependencyType: "save" });
+			angularTemplatePath = await prepareTestingPath(projectIntegrationTest.testInjector, constants.RESERVED_TEMPLATE_NAMES["angular"], constants.RESERVED_TEMPLATE_NAMES["angular"]);
+			typescriptTemplatePath = await prepareTestingPath(projectIntegrationTest.testInjector, constants.RESERVED_TEMPLATE_NAMES["typescript"], constants.RESERVED_TEMPLATE_NAMES["typescript"]);
+			noAppResourcesTemplatePath = await prepareTestingPath(projectIntegrationTest.testInjector, noAppResourcesTemplateName, noAppResourcesTemplateName, { dependencyType: "save", version: "2.0.0" });
 		});
 
 		it("creates valid project from default template", async () => {
@@ -339,28 +290,32 @@ describe("Project Service Tests", () => {
 			let projectIntegrationTest = new ProjectIntegrationTest();
 			let tempFolder = temp.mkdirSync("projectLocalDir");
 			let projectName = "myapp";
+			const template = "https://github.com/NativeScript/template-hello-world/tarball/master";
 
 			await projectIntegrationTest.createProject({
 				projectName: projectName,
-				template: "https://github.com/NativeScript/template-hello-world/tarball/master",
+				template,
 				pathToProject: tempFolder
 			});
 
-			await projectIntegrationTest.assertProject(tempFolder, projectName, "org.nativescript.myapp", defaultTemplatePath);
+			const projectSourceDirectory = await prepareTestingPath(projectIntegrationTest.testInjector, template, constants.RESERVED_TEMPLATE_NAMES["default"]);
+			await projectIntegrationTest.assertProject(tempFolder, projectName, "org.nativescript.myapp", projectSourceDirectory);
 		});
 
 		it("creates valid project from git url", async () => {
 			let projectIntegrationTest = new ProjectIntegrationTest();
 			let tempFolder = temp.mkdirSync("projectLocalDir");
 			let projectName = "myapp";
+			const template = "https://github.com/NativeScript/template-hello-world.git";
 
 			await projectIntegrationTest.createProject({
 				projectName: projectName,
-				template: "https://github.com/NativeScript/template-hello-world.git",
+				template,
 				pathToProject: tempFolder
 			});
 
-			await projectIntegrationTest.assertProject(tempFolder, projectName, "org.nativescript.myapp", defaultTemplatePath);
+			const projectSourceDirectory = await prepareTestingPath(projectIntegrationTest.testInjector, template, constants.RESERVED_TEMPLATE_NAMES["default"]);
+			await projectIntegrationTest.assertProject(tempFolder, projectName, "org.nativescript.myapp", projectSourceDirectory);
 		});
 
 		it("creates valid project with specified id from default template", async () => {
@@ -471,6 +426,7 @@ describe("Project Service Tests", () => {
 			testInjector.register("projectTemplatesService", {});
 			testInjector.register("staticConfig", {});
 			testInjector.register("projectHelper", {});
+			testInjector.register("npmInstallationManager", {});
 
 			return testInjector;
 		};

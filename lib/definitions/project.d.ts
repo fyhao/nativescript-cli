@@ -105,6 +105,8 @@ interface IProjectDataService {
 	 * @returns {void}
 	 */
 	removeDependency(projectDir: string, dependencyName: string): void;
+
+	getProjectData(projectDir: string): IProjectData;
 }
 
 /**
@@ -128,6 +130,10 @@ interface IPlatformProjectServiceBase {
 
 interface IBuildForDevice {
 	buildForDevice: boolean;
+}
+
+interface INativePrepare {
+	skipNativePrepare: boolean;
 }
 
 interface IBuildConfig extends IAndroidBuildOptionsSettings, IiOSBuildConfig {
@@ -225,7 +231,7 @@ interface IPlatformProjectService extends NodeJS.EventEmitter {
 	removePluginNativeCode(pluginData: IPluginData, projectData: IProjectData): Promise<void>;
 
 	afterPrepareAllPlugins(projectData: IProjectData): Promise<void>;
-	beforePrepareAllPlugins(projectData: IProjectData, dependencies?: IDictionary<IDependencyData>): Promise<void>;
+	beforePrepareAllPlugins(projectData: IProjectData, dependencies?: IDependencyData[]): Promise<void>;
 
 	/**
 	 * Gets the path wheren App_Resources should be copied.
@@ -273,8 +279,8 @@ interface IAndroidProjectPropertiesManager {
 }
 
 interface ITestExecutionService {
-	startTestRunner(platform: string, projectData: IProjectData): Promise<void>;
-	startKarmaServer(platform: string, projectData: IProjectData): Promise<void>;
+	startTestRunner(platform: string, projectData: IProjectData, projectFilesConfig: IProjectFilesConfig): Promise<void>;
+	startKarmaServer(platform: string, projectData: IProjectData, projectFilesConfig: IProjectFilesConfig): Promise<void>;
 }
 
 /**

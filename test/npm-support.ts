@@ -20,13 +20,13 @@ import { DeviceAppDataFactory } from "../lib/common/mobile/device-app-data/devic
 import { LocalToDevicePathDataFactory } from "../lib/common/mobile/local-to-device-path-data-factory";
 import { MobileHelper } from "../lib/common/mobile/mobile-helper";
 import { ProjectFilesProvider } from "../lib/providers/project-files-provider";
-import { DeviceAppDataProvider } from "../lib/providers/device-app-data-provider";
 import { MobilePlatformsCapabilities } from "../lib/mobile-platforms-capabilities";
 import { DevicePlatformsConstants } from "../lib/common/mobile/device-platforms-constants";
 import { XmlValidator } from "../lib/xml-validator";
 import { LockFile } from "../lib/lockfile";
 import ProjectChangesLib = require("../lib/services/project-changes-service");
 import { Messages } from "../lib/common/messages/messages";
+import { NodeModulesDependenciesBuilder } from "../lib/tools/node-modules/node-modules-dependencies-builder";
 
 import path = require("path");
 import temp = require("temp");
@@ -73,7 +73,6 @@ function createTestInjector(): IInjector {
 	testInjector.register("localToDevicePathDataFactory", LocalToDevicePathDataFactory);
 	testInjector.register("mobileHelper", MobileHelper);
 	testInjector.register("projectFilesProvider", ProjectFilesProvider);
-	testInjector.register("deviceAppDataProvider", DeviceAppDataProvider);
 	testInjector.register("mobilePlatformsCapabilities", MobilePlatformsCapabilities);
 	testInjector.register("devicePlatformsConstants", DevicePlatformsConstants);
 	testInjector.register("xmlValidator", XmlValidator);
@@ -81,9 +80,12 @@ function createTestInjector(): IInjector {
 	testInjector.register("projectChangesService", ProjectChangesLib.ProjectChangesService);
 	testInjector.register("emulatorPlatformService", stubs.EmulatorPlatformService);
 	testInjector.register("analyticsService", {
-		track: async () => undefined
+		track: async (): Promise<any> => undefined
 	});
 	testInjector.register("messages", Messages);
+	testInjector.register("nodeModulesDependenciesBuilder", NodeModulesDependenciesBuilder);
+
+	testInjector.register("devicePathProvider", {});
 
 	return testInjector;
 }
@@ -160,7 +162,8 @@ async function setupProject(dependencies?: any): Promise<any> {
 				interpolateConfigurationFile: (): void => undefined,
 				isPlatformPrepared: (projectRoot: string) => false,
 				validatePlugins: (projectData: IProjectData) => Promise.resolve(),
-				checkForChanges: () => { /* */ }
+				checkForChanges: () => { /* */ },
+				cleanProject: () => Promise.resolve()
 			}
 		};
 	};
@@ -317,7 +320,7 @@ describe("Flatten npm modules tests", () => {
 		let gulpJshint = path.join(tnsModulesFolderPath, "gulp-jshint");
 		assert.isFalse(fs.exists(gulpJshint));
 
-		// Get  all gulp dependencies
+		// Get	all gulp dependencies
 		let gulpJsonContent = fs.readJson(path.join(projectFolder, nodeModulesFolderName, "gulp", packageJsonName));
 		_.each(_.keys(gulpJsonContent.dependencies), dependency => {
 			assert.isFalse(fs.exists(path.join(tnsModulesFolderPath, dependency)));

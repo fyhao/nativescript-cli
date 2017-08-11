@@ -1,143 +1,195 @@
-﻿import { EOL } from "os";
+﻿import { CONNECTED_STATUS } from "../common/constants";
+import { isInteractive } from "../common/helpers";
+import { cache } from "../common/decorators";
+import { DebugCommandErrors } from "../constants";
 
-export abstract class DebugPlatformCommand implements ICommand {
+export class DebugPlatformCommand implements ICommand {
 	public allowedParameters: ICommandParameter[] = [];
 
 	constructor(private debugService: IPlatformDebugService,
-		private $devicesService: Mobile.IDevicesService,
-		private $injector: IInjector,
-		private $devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
-		private $config: IConfiguration,
-		private $usbLiveSyncService: ILiveSyncService,
-		private $debugDataService: IDebugDataService,
+		private platform: string,
+		protected $devicesService: Mobile.IDevicesService,
 		protected $platformService: IPlatformService,
 		protected $projectData: IProjectData,
 		protected $options: IOptions,
 		protected $platformsData: IPlatformsData,
-		protected $logger: ILogger) {
-		this.$projectData.initializeProjectData();
+		protected $logger: ILogger,
+		protected $errors: IErrors,
+		private $debugDataService: IDebugDataService,
+		private $debugLiveSyncService: IDebugLiveSyncService,
+		private $config: IConfiguration,
+		private $prompter: IPrompter,
+		private $liveSyncCommandHelper: ILiveSyncCommandHelper) {
 	}
 
 	public async execute(args: string[]): Promise<void> {
 		const debugOptions = this.$options;
-		const deployOptions: IDeployPlatformOptions = {
-			clean: this.$options.clean,
-			device: this.$options.device,
-			emulator: this.$options.emulator,
-			platformTemplate: this.$options.platformTemplate,
-			projectDir: this.$options.path,
-			release: this.$options.release,
-			provision: this.$options.provision,
-			teamId: this.$options.teamId
-		};
 
 		let debugData = this.$debugDataService.createDebugData(this.$projectData, this.$options);
 
 		await this.$platformService.trackProjectType(this.$projectData);
 
+		const selectedDeviceForDebug = await this.getDeviceForDebug();
+		debugData.deviceIdentifier = selectedDeviceForDebug.deviceInfo.identifier;
+
 		if (this.$options.start) {
-			return this.printDebugInformation(await this.debugService.debug<string[]>(debugData, debugOptions));
+			return this.$debugLiveSyncService.printDebugInformation(await this.debugService.debug(debugData, debugOptions));
 		}
 
-		const appFilesUpdaterOptions: IAppFilesUpdaterOptions = { bundle: this.$options.bundle, release: this.$options.release };
-
-		await this.$platformService.deployPlatform(this.$devicesService.platform, appFilesUpdaterOptions, deployOptions, this.$projectData, this.$options);
 		this.$config.debugLivesync = true;
-		let applicationReloadAction = async (deviceAppData: Mobile.IDeviceAppData): Promise<void> => {
-			let projectData: IProjectData = this.$injector.resolve("projectData");
 
-			await this.debugService.debugStop();
+		await this.$devicesService.detectCurrentlyAttachedDevices({ shouldReturnImmediateResult: false, platform: this.platform });
 
-			let applicationId = deviceAppData.appIdentifier;
-			if (deviceAppData.device.isEmulator && deviceAppData.platform.toLowerCase() === this.$devicePlatformsConstants.iOS.toLowerCase()) {
-				applicationId = projectData.projectName;
+		await this.$liveSyncCommandHelper.executeLiveSyncOperation([selectedDeviceForDebug], this.$debugLiveSyncService, this.platform);
+	}
+
+	public async getDeviceForDebug(): Promise<Mobile.IDevice> {
+		if (this.$options.forDevice && this.$options.emulator) {
+			this.$errors.fail(DebugCommandErrors.UNABLE_TO_USE_FOR_DEVICE_AND_EMULATOR);
+		}
+
+		await this.$devicesService.detectCurrentlyAttachedDevices({ platform: this.platform, shouldReturnImmediateResult: false });
+
+		if (this.$options.device) {
+			const device = await this.$devicesService.getDevice(this.$options.device);
+			return device;
+		}
+
+		// Now let's take data for each device:
+		const availableDevicesAndEmulators = this.$devicesService.getDeviceInstances()
+			.filter(d => d.deviceInfo.status === CONNECTED_STATUS && (!this.platform || d.deviceInfo.platform.toLowerCase() === this.platform.toLowerCase()));
+
+		const selectedDevices = availableDevicesAndEmulators.filter(d => this.$options.emulator ? d.isEmulator : (this.$options.forDevice ? !d.isEmulator : true));
+
+		if (selectedDevices.length > 1) {
+			if (isInteractive()) {
+				const choices = selectedDevices.map(e => `${e.deviceInfo.identifier} - ${e.deviceInfo.displayName}`);
+
+				const selectedDeviceString = await this.$prompter.promptForChoice("Select device for debugging", choices);
+
+				const selectedDevice = _.find(selectedDevices, d => `${d.deviceInfo.identifier} - ${d.deviceInfo.displayName}` === selectedDeviceString);
+				return selectedDevice;
+			} else {
+				const sortedInstances = _.sortBy(selectedDevices, e => e.deviceInfo.version);
+				const emulators = sortedInstances.filter(e => e.isEmulator);
+				const devices = sortedInstances.filter(d => !d.isEmulator);
+				let selectedInstance: Mobile.IDevice;
+
+				if (this.$options.emulator || this.$options.forDevice) {
+					// When --emulator or --forDevice is passed, the instances are already filtered
+					// So we are sure we have exactly the type we need and we can safely return the last one (highest OS version).
+					selectedInstance = _.last(sortedInstances);
+				} else {
+					if (emulators.length) {
+						selectedInstance = _.last(emulators);
+					} else {
+						selectedInstance = _.last(devices);
+					}
+				}
+
+				this.$logger.warn(`Multiple devices/emulators found. Starting debugger on ${selectedInstance.deviceInfo.identifier}. ` +
+					"If you want to debug on specific device/emulator, you can specify it with --device option.");
+
+				return selectedInstance;
 			}
+		} else if (selectedDevices.length === 1) {
+			return _.head(selectedDevices);
+		}
 
-			await deviceAppData.device.applicationManager.stopApplication(applicationId);
-
-			const buildConfig: IBuildConfig = _.merge({ buildForDevice: !deviceAppData.device.isEmulator }, deployOptions);
-			debugData.pathToAppPackage = this.$platformService.lastOutputPath(this.debugService.platform, buildConfig, projectData);
-
-			this.printDebugInformation(await this.debugService.debug<string[]>(debugData, debugOptions));
-		};
-
-		return this.$usbLiveSyncService.liveSync(this.$devicesService.platform, this.$projectData, applicationReloadAction);
+		this.$errors.failWithoutHelp(DebugCommandErrors.NO_DEVICES_EMULATORS_FOUND_FOR_OPTIONS);
 	}
 
 	public async canExecute(args: string[]): Promise<boolean> {
-		await this.$devicesService.initialize({ platform: this.debugService.platform, deviceId: this.$options.device });
-		// Start emulator if --emulator is selected or no devices found.
-		if (this.$options.emulator || this.$devicesService.deviceCount === 0) {
-			return true;
+		if (!this.$platformService.isPlatformSupportedForOS(this.platform, this.$projectData)) {
+			this.$errors.fail(`Applications for platform ${this.platform} can not be built on this OS`);
 		}
 
-		if (this.$devicesService.deviceCount > 1) {
-			// Starting debugger on emulator.
-			this.$options.emulator = true;
+		const platformData = this.$platformsData.getPlatformData(this.platform, this.$projectData);
+		const platformProjectService = platformData.platformProjectService;
+		await platformProjectService.validate(this.$projectData);
 
-			this.$logger.warn("Multiple devices found! Starting debugger on emulator. If you want to debug on specific device please select device with --device option.".yellow.bold);
-		}
+		await this.$devicesService.initialize({
+			platform: this.platform,
+			deviceId: this.$options.device,
+			emulator: this.$options.emulator,
+			skipDeviceDetectionInterval: true
+		});
 
 		return true;
 	}
-
-	protected printDebugInformation(information: string[]): void {
-		_.each(information, i => {
-			this.$logger.info(`To start debugging, open the following URL in Chrome:${EOL}${i}${EOL}`.cyan);
-		});
-	}
 }
 
-export class DebugIOSCommand extends DebugPlatformCommand {
-	constructor(protected $logger: ILogger,
-		$iOSDebugService: IPlatformDebugService,
-		$devicesService: Mobile.IDevicesService,
-		$injector: IInjector,
-		$devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
-		$config: IConfiguration,
-		$usbLiveSyncService: ILiveSyncService,
-		$debugDataService: IDebugDataService,
-		$platformService: IPlatformService,
-		$options: IOptions,
-		$projectData: IProjectData,
-		$platformsData: IPlatformsData,
+export class DebugIOSCommand implements ICommand {
+
+	@cache()
+	private get debugPlatformCommand(): DebugPlatformCommand {
+		return this.$injector.resolve<DebugPlatformCommand>(DebugPlatformCommand, { debugService: this.$iOSDebugService, platform: this.platform });
+	}
+
+	public allowedParameters: ICommandParameter[] = [];
+
+	constructor(protected $errors: IErrors,
+		private $devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
+		private $platformService: IPlatformService,
+		private $options: IOptions,
+		private $injector: IInjector,
+		private $projectData: IProjectData,
+		private $platformsData: IPlatformsData,
+		private $iOSDebugService: IDebugService,
 		$iosDeviceOperations: IIOSDeviceOperations) {
-		super($iOSDebugService, $devicesService, $injector, $devicePlatformsConstants, $config, $usbLiveSyncService, $debugDataService, $platformService, $projectData, $options, $platformsData, $logger);
-		$iosDeviceOperations.setShouldDispose(this.$options.justlaunch);
+		this.$projectData.initializeProjectData();
+		// Do not dispose ios-device-lib, so the process will remain alive and the debug application (NativeScript Inspector or Chrome DevTools) will be able to connect to the socket.
+		// In case we dispose ios-device-lib, the socket will be closed and the code will fail when the debug application tries to read/send data to device socket.
+		// That's why the `$ tns debug ios --justlaunch` command will not release the terminal.
+		// In case we do not set it to false, the dispose will be called once the command finishes its execution, which will prevent the debugging.
+		$iosDeviceOperations.setShouldDispose(false);
+	}
+
+	public execute(args: string[]): Promise<void> {
+		return this.debugPlatformCommand.execute(args);
 	}
 
 	public async canExecute(args: string[]): Promise<boolean> {
-		return await super.canExecute(args) && await this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.iOS);
+		if (!this.$platformService.isPlatformSupportedForOS(this.$devicePlatformsConstants.iOS, this.$projectData)) {
+			this.$errors.fail(`Applications for platform ${this.$devicePlatformsConstants.iOS} can not be built on this OS`);
+		}
+
+		return await this.debugPlatformCommand.canExecute(args) && await this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.iOS);
 	}
 
-	protected printDebugInformation(information: string[]): void {
-		if (this.$options.chrome) {
-			super.printDebugInformation(information);
-		}
-	}
+	public platform = this.$devicePlatformsConstants.iOS;
 }
 
 $injector.registerCommand("debug|ios", DebugIOSCommand);
 
-export class DebugAndroidCommand extends DebugPlatformCommand {
-	constructor($logger: ILogger,
-		$androidDebugService: IPlatformDebugService,
-		$devicesService: Mobile.IDevicesService,
-		$injector: IInjector,
-		$devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
-		$config: IConfiguration,
-		$usbLiveSyncService: ILiveSyncService,
-		$debugDataService: IDebugDataService,
-		$platformService: IPlatformService,
-		$options: IOptions,
-		$projectData: IProjectData,
-		$platformsData: IPlatformsData) {
-		super($androidDebugService, $devicesService, $injector, $devicePlatformsConstants, $config, $usbLiveSyncService, $debugDataService, $platformService, $projectData, $options, $platformsData, $logger);
+export class DebugAndroidCommand implements ICommand {
+
+	@cache()
+	private get debugPlatformCommand(): DebugPlatformCommand {
+		return this.$injector.resolve<DebugPlatformCommand>(DebugPlatformCommand, { debugService: this.$androidDebugService, platform: this.platform });
 	}
 
-	public async canExecute(args: string[]): Promise<boolean> {
-		return await super.canExecute(args) && await this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.Android);
+	public allowedParameters: ICommandParameter[] = [];
+
+	constructor(protected $errors: IErrors,
+		private $devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
+		private $platformService: IPlatformService,
+		private $options: IOptions,
+		private $injector: IInjector,
+		private $projectData: IProjectData,
+		private $platformsData: IPlatformsData,
+		private $androidDebugService: IDebugService) {
+		this.$projectData.initializeProjectData();
 	}
+
+	public execute(args: string[]): Promise<void> {
+		return this.debugPlatformCommand.execute(args);
+	}
+	public async canExecute(args: string[]): Promise<boolean> {
+		return await this.debugPlatformCommand.canExecute(args) && await this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.Android);
+	}
+
+	public platform = this.$devicePlatformsConstants.Android;
 }
 
 $injector.registerCommand("debug|android", DebugAndroidCommand);

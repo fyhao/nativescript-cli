@@ -3,19 +3,24 @@ run
 
 Usage | Synopsis
 ---|---
-<% if((isConsole && isMacOS) || isHtml) { %>General | `$ tns run <Platform>`<% } %><% if(isConsole && (isLinux || isWindows)) { %>General | `$ tns run android`<% } %>
+Run on all connected devices | `$ tns run [--release] [--justlaunch]`
+Run on a selected connected device or running emulator. Will start emulator with specified `Device Identifier`, if not already running. | `$ tns run --device <Device ID> [--release] [--justlaunch]`
 
-Runs your project on all connected devices or in native emulators for the selected platform.<% if(isMacOS) { %> You must specify the target platform on which you want to run your project.<% } %><% if(isConsole && (isLinux || isWindows)) { %>You must run `$ tns run android`<% } %> The command will prepare, build and deploy the app when necessary. By default listens for changes in your code, synchronizes those changes and refreshes all selected devices.
+Runs your project on all connected devices or in native emulators for the selected platform.<% if(isConsole && (isLinux || isWindows)) { %>The command will work with all currently running Android devices and emulators.<% } %> The command will prepare, build and deploy the app when necessary. By default listens for changes in your code, synchronizes those changes and refreshes all selected devices.
 
-<% if((isConsole && isMacOS) || isHtml) { %>### Attributes
-`<Platform>` is the target mobile platform on which you want to run your project. You can set the following target platforms.
-* `android` - Runs your project on a connected Android device, in the native emulator.
-* `ios` - Runs your project on a connected iOS device or in the iOS Simulator.<% } %>
+### Options
+* `--justlaunch` - If set, does not print the application output in the console.
+* `--release` - If set, produces a release build. Otherwise, produces a debug build.
+* `--device` - Specifies a connected device/emulator to start and run the app.
+
+### Attributes
+* `<Device ID>` is the index or `Device Identifier` of the target device as listed by `$ tns device <Platform> --available-devices`
 
 <% if(isHtml) { %>
 ### Command Limitations
 
-* You can run `$ tns run ios` only on OS X systems.
+* The command will work with all connected devices and running emulators on macOS. On Windows and Linux the command will work with Android devices only.
+* In case a platform is not specified and there's no running devices and emulators, the command will fail.
 
 ### Related Commands
 
@@ -30,9 +35,6 @@ Command | Description
 [debug ios](debug-ios.html) | Debugs your project on a connected iOS device or in a native emulator.
 [debug](debug.html) | Debugs your project on a connected device or in a native emulator.
 [deploy](deploy.html) | Builds and deploys the project to a connected physical or virtual device.
-[emulate android](emulate-android.html) | Builds the specified project and runs it in a native Android emulator.
-[emulate ios](emulate-ios.html) | Builds the specified project and runs it in the native iOS Simulator.
-[emulate](emulate.html) | You must run the emulate command with a related command.
 [run android](run-android.html) | Runs your project on a connected Android device or in a native Android emulator, if configured.
 [run ios](run-ios.html) | Runs your project on a connected iOS device or in the iOS Simulator, if configured.
 [test init](test-init.html) | Configures your project for unit testing with a selected framework.

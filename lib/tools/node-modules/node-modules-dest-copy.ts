@@ -15,7 +15,7 @@ export class TnsModulesCopy {
 	) {
 	}
 
-	public copyModules(dependencies: any[], platform: string): void {
+	public copyModules(dependencies: IDependencyData[], platform: string): void {
 		for (let entry in dependencies) {
 			let dependency = dependencies[entry];
 
@@ -29,26 +29,50 @@ export class TnsModulesCopy {
 				let matchPattern = this.$options.release ? "**/*.ts" : "**/*.d.ts";
 				allFiles.filter(file => minimatch(file, matchPattern, { nocase: true })).map(file => this.$fs.deleteFile(file));
 
-				shelljs.rm("-rf", path.join(tnsCoreModulesResourcePath, "node_modules"));
+				shelljs.rm("-rf", path.join(tnsCoreModulesResourcePath, constants.NODE_MODULES_FOLDER_NAME));
 			}
 		}
 	}
 
-	private copyDependencyDir(dependency: any): void {
+	private copyDependencyDir(dependency: IDependencyData): void {
 		if (dependency.depth === 0) {
-			let isScoped = dependency.name.indexOf("@") === 0;
-			let targetDir = this.outputRoot;
+			const targetPackageDir = path.join(this.outputRoot, dependency.name);
 
-			if (isScoped) {
-				targetDir = path.join(this.outputRoot, dependency.name.substring(0, dependency.name.indexOf("/")));
-			}
+			shelljs.mkdir("-p", targetPackageDir);
 
-			shelljs.mkdir("-p", targetDir);
-			shelljs.cp("-Rf", dependency.directory, targetDir);
+			const isScoped = dependency.name.indexOf("@") === 0;
+			const destinationPath = isScoped ? path.join(this.outputRoot, dependency.name.substring(0, dependency.name.indexOf("/"))) : this.outputRoot;
+			shelljs.cp("-RfL", dependency.directory, destinationPath);
 
-			//remove platform-specific files (processed separately by plugin services)
-			const targetPackageDir = path.join(targetDir, dependency.name);
+			// remove platform-specific files (processed separately by plugin services)
 			shelljs.rm("-rf", path.join(targetPackageDir, "platforms"));
+
+			this.removeNonProductionDependencies(dependency, targetPackageDir);
+		}
+	}
+
+	private removeNonProductionDependencies(dependency: IDependencyData, targetPackageDir: string): void {
+		const packageJsonFilePath = path.join(dependency.directory, constants.PACKAGE_JSON_FILE_NAME);
+		if (!this.$fs.exists(packageJsonFilePath)) {
+			return;
+		}
+
+		const packageJsonContent = this.$fs.readJson(packageJsonFilePath);
+		const productionDependencies = packageJsonContent.dependencies;
+
+		const dependenciesFolder = path.join(targetPackageDir, constants.NODE_MODULES_FOLDER_NAME);
+		if (this.$fs.exists(dependenciesFolder)) {
+			const dependencies = _.flatten(this.$fs.readDirectory(dependenciesFolder)
+				.map(dir => {
+					if (_.startsWith(dir, "@")) {
+						return this.$fs.readDirectory(path.join(dependenciesFolder, dir));
+					}
+
+					return dir;
+				}));
+
+			dependencies.filter(dir => !productionDependencies || !productionDependencies.hasOwnProperty(dir))
+				.forEach(dir => shelljs.rm("-rf", path.join(dependenciesFolder, dir)));
 		}
 	}
 }
@@ -57,22 +81,23 @@ export class NpmPluginPrepare {
 	constructor(
 		private $fs: IFileSystem,
 		private $pluginsService: IPluginsService,
-		private $platformsData: IPlatformsData
+		private $platformsData: IPlatformsData,
+		private $logger: ILogger
 	) {
 	}
 
-	protected async beforePrepare(dependencies: IDictionary<IDependencyData>, platform: string, projectData: IProjectData): Promise<void> {
+	protected async beforePrepare(dependencies: IDependencyData[], platform: string, projectData: IProjectData): Promise<void> {
 		await this.$platformsData.getPlatformData(platform, projectData).platformProjectService.beforePrepareAllPlugins(projectData, dependencies);
 	}
 
-	protected async afterPrepare(dependencies: IDictionary<IDependencyData>, platform: string, projectData: IProjectData): Promise<void> {
+	protected async afterPrepare(dependencies: IDependencyData[], platform: string, projectData: IProjectData): Promise<void> {
 		await this.$platformsData.getPlatformData(platform, projectData).platformProjectService.afterPrepareAllPlugins(projectData);
 		this.writePreparedDependencyInfo(dependencies, platform, projectData);
 	}
 
-	private writePreparedDependencyInfo(dependencies: IDictionary<IDependencyData>, platform: string, projectData: IProjectData): void {
+	private writePreparedDependencyInfo(dependencies: IDependencyData[], platform: string, projectData: IProjectData): void {
 		let prepareData: IDictionary<boolean> = {};
-		_.values(dependencies).forEach(d => {
+		_.each(dependencies, d => {
 			prepareData[d.name] = true;
 		});
 		this.$fs.createDirectory(this.preparedPlatformsDir(platform, projectData));
@@ -101,10 +126,10 @@ export class NpmPluginPrepare {
 		return this.$fs.readJson(this.preparedPlatformsFile(platform, projectData), "utf8");
 	}
 
-	private allPrepared(dependencies: IDictionary<IDependencyData>, platform: string, projectData: IProjectData): boolean {
+	private allPrepared(dependencies: IDependencyData[], platform: string, projectData: IProjectData): boolean {
 		let result = true;
 		const previouslyPrepared = this.getPreviouslyPreparedDependencies(platform, projectData);
-		_.values(dependencies).forEach(d => {
+		_.each(dependencies, d => {
 			if (!previouslyPrepared[d.name]) {
 				result = false;
 			}
@@ -112,7 +137,7 @@ export class NpmPluginPrepare {
 		return result;
 	}
 
-	public async preparePlugins(dependencies: IDictionary<IDependencyData>, platform: string, projectData: IProjectData): Promise<void> {
+	public async preparePlugins(dependencies: IDependencyData[], platform: string, projectData: IProjectData, projectFilesConfig: IProjectFilesConfig): Promise<void> {
 		if (_.isEmpty(dependencies) || this.allPrepared(dependencies, platform, projectData)) {
 			return;
 		}
@@ -122,10 +147,33 @@ export class NpmPluginPrepare {
 			const dependency = dependencies[dependencyKey];
 			let isPlugin = !!dependency.nativescript;
 			if (isPlugin) {
-				await this.$pluginsService.prepare(dependency, platform, projectData);
+				let pluginData = this.$pluginsService.convertToPluginData(dependency, projectData.projectDir);
+				await this.$pluginsService.preparePluginNativeCode(pluginData, platform, projectData);
 			}
 		}
 
 		await this.afterPrepare(dependencies, platform, projectData);
+	}
+
+	public async prepareJSPlugins(dependencies: IDependencyData[], platform: string, projectData: IProjectData, projectFilesConfig: IProjectFilesConfig): Promise<void> {
+		if (_.isEmpty(dependencies) || this.allPrepared(dependencies, platform, projectData)) {
+			return;
+}
+
+		for (let dependencyKey in dependencies) {
+			const dependency = dependencies[dependencyKey];
+			let isPlugin = !!dependency.nativescript;
+			if (isPlugin) {
+				platform = platform.toLowerCase();
+				let pluginData = this.$pluginsService.convertToPluginData(dependency, projectData.projectDir);
+				let platformData = this.$platformsData.getPlatformData(platform, projectData);
+				let appFolderExists = this.$fs.exists(path.join(platformData.appDestinationDirectoryPath, constants.APP_FOLDER_NAME));
+				if (appFolderExists) {
+					this.$pluginsService.preparePluginScripts(pluginData, platform, projectData, projectFilesConfig);
+					// Show message
+					this.$logger.out(`Successfully prepared plugin ${pluginData.name} for ${platform}.`);
+				}
+			}
+		}
 	}
 }

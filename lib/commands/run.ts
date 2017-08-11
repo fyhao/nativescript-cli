@@ -1,96 +1,146 @@
-export class RunCommandBase {
+import { ERROR_NO_VALID_SUBCOMMAND_FORMAT } from "../common/constants";
+import { cache } from "../common/decorators";
+
+export class RunCommandBase implements ICommand {
+
+	public platform: string;
 	constructor(protected $platformService: IPlatformService,
-		protected $usbLiveSyncService: ILiveSyncService,
+		protected $liveSyncService: ILiveSyncService,
 		protected $projectData: IProjectData,
 		protected $options: IOptions,
-		protected $emulatorPlatformService: IEmulatorPlatformService) {
+		protected $devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
+		protected $errors: IErrors,
+		protected $devicesService: Mobile.IDevicesService,
+		protected $platformsData: IPlatformsData,
+		private $hostInfo: IHostInfo,
+		private $liveSyncCommandHelper: ILiveSyncCommandHelper
+	) { }
+
+	public allowedParameters: ICommandParameter[] = [];
+	public async execute(args: string[]): Promise<void> {
+		return this.executeCore(args);
+	}
+
+	public async canExecute(args: string[]): Promise<boolean> {
+		if (args.length) {
+			this.$errors.fail(ERROR_NO_VALID_SUBCOMMAND_FORMAT, "run");
+		}
+
 		this.$projectData.initializeProjectData();
+		this.platform = args[0] || this.platform;
+
+		if (!this.platform && !this.$hostInfo.isDarwin) {
+			this.platform = this.$devicePlatformsConstants.Android;
+		}
+
+		const availablePlatforms = this.$liveSyncCommandHelper.getPlatformsForOperation(this.platform);
+		for (let platform of availablePlatforms) {
+			const platformData = this.$platformsData.getPlatformData(platform, this.$projectData);
+			const platformProjectService = platformData.platformProjectService;
+			await platformProjectService.validate(this.$projectData);
+		}
+
+		return true;
 	}
 
 	public async executeCore(args: string[]): Promise<void> {
-
-		const appFilesUpdaterOptions: IAppFilesUpdaterOptions = { bundle: this.$options.bundle, release: this.$options.release };
-		const deployOptions: IDeployPlatformOptions = {
-			clean: this.$options.clean,
-			device: this.$options.device,
-			emulator: this.$options.emulator,
-			projectDir: this.$options.path,
-			platformTemplate: this.$options.platformTemplate,
-			release: this.$options.release,
-			provision: this.$options.provision,
-			teamId: this.$options.teamId,
-			keyStoreAlias: this.$options.keyStoreAlias,
-			keyStoreAliasPassword: this.$options.keyStoreAliasPassword,
-			keyStorePassword: this.$options.keyStorePassword,
-			keyStorePath: this.$options.keyStorePath
-		};
-
-		await this.$platformService.deployPlatform(args[0], appFilesUpdaterOptions, deployOptions, this.$projectData, this.$options);
-
 		if (this.$options.bundle) {
 			this.$options.watch = false;
 		}
 
-		if (this.$options.release) {
-			const deployOpts: IRunPlatformOptions = {
-				device: this.$options.device,
-				emulator: this.$options.emulator,
-				justlaunch: this.$options.justlaunch,
-			};
+		await this.$devicesService.initialize({
+			deviceId: this.$options.device,
+			platform: this.platform,
+			emulator: this.$options.emulator,
+			skipDeviceDetectionInterval: true,
+			skipInferPlatform: !this.platform
+		});
 
-			await this.$platformService.startApplication(args[0], deployOpts, this.$projectData.projectId);
-			return this.$platformService.trackProjectType(this.$projectData);
-		}
-
-		return this.$usbLiveSyncService.liveSync(args[0], this.$projectData);
+		await this.$devicesService.detectCurrentlyAttachedDevices({ shouldReturnImmediateResult: false, platform: this.platform });
+		let devices = this.$devicesService.getDeviceInstances();
+		devices = devices.filter(d => !this.platform || d.deviceInfo.platform.toLowerCase() === this.platform.toLowerCase());
+		await this.$liveSyncCommandHelper.executeLiveSyncOperation(devices, this.$liveSyncService, this.platform);
 	}
 }
 
-export class RunIosCommand extends RunCommandBase implements ICommand {
-	public allowedParameters: ICommandParameter[] = [];
+$injector.registerCommand("run|*all", RunCommandBase);
 
-	constructor($platformService: IPlatformService,
-		private $platformsData: IPlatformsData,
-		$usbLiveSyncService: ILiveSyncService,
-		$projectData: IProjectData,
-		$options: IOptions,
-		$emulatorPlatformService: IEmulatorPlatformService) {
-		super($platformService, $usbLiveSyncService, $projectData, $options, $emulatorPlatformService);
+export class RunIosCommand implements ICommand {
+
+	@cache()
+	private get runCommand(): RunCommandBase {
+		const runCommand = this.$injector.resolve<RunCommandBase>(RunCommandBase);
+		runCommand.platform = this.platform;
+		return runCommand;
+	}
+
+	public allowedParameters: ICommandParameter[] = [];
+	public get platform(): string {
+		return this.$devicePlatformsConstants.iOS;
+	}
+
+	constructor(protected $platformsData: IPlatformsData,
+		protected $devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
+		protected $errors: IErrors,
+		private $injector: IInjector,
+		private $platformService: IPlatformService,
+		private $projectData: IProjectData,
+		private $options: IOptions) {
 	}
 
 	public async execute(args: string[]): Promise<void> {
-		return this.executeCore([this.$platformsData.availablePlatforms.iOS]);
+		if (!this.$platformService.isPlatformSupportedForOS(this.$devicePlatformsConstants.iOS, this.$projectData)) {
+			this.$errors.fail(`Applications for platform ${this.$devicePlatformsConstants.iOS} can not be built on this OS`);
+		}
+
+		return this.runCommand.executeCore(args);
 	}
 
 	public async canExecute(args: string[]): Promise<boolean> {
-		return args.length === 0 && await this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.iOS);
+		return await this.runCommand.canExecute(args) && await this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.iOS);
 	}
 }
 
 $injector.registerCommand("run|ios", RunIosCommand);
 
-export class RunAndroidCommand extends RunCommandBase implements ICommand {
-	public allowedParameters: ICommandParameter[] = [];
+export class RunAndroidCommand implements ICommand {
 
-	constructor($platformService: IPlatformService,
-		private $platformsData: IPlatformsData,
-		$usbLiveSyncService: ILiveSyncService,
-		$projectData: IProjectData,
-		$options: IOptions,
-		$emulatorPlatformService: IEmulatorPlatformService,
-		private $errors: IErrors) {
-		super($platformService, $usbLiveSyncService, $projectData, $options, $emulatorPlatformService);
+	@cache()
+	private get runCommand(): RunCommandBase {
+		const runCommand = this.$injector.resolve<RunCommandBase>(RunCommandBase);
+		runCommand.platform = this.platform;
+		return runCommand;
+	}
+
+	public allowedParameters: ICommandParameter[] = [];
+	public get platform(): string {
+		return this.$devicePlatformsConstants.Android;
+	}
+
+	constructor(protected $platformsData: IPlatformsData,
+		protected $devicePlatformsConstants: Mobile.IDevicePlatformsConstants,
+		protected $errors: IErrors,
+		private $injector: IInjector,
+		private $platformService: IPlatformService,
+		private $projectData: IProjectData,
+		private $options: IOptions) {
 	}
 
 	public async execute(args: string[]): Promise<void> {
-		return this.executeCore([this.$platformsData.availablePlatforms.Android]);
+		return this.runCommand.executeCore(args);
 	}
 
 	public async canExecute(args: string[]): Promise<boolean> {
+		await this.runCommand.canExecute(args);
+
+		if (!this.$platformService.isPlatformSupportedForOS(this.$devicePlatformsConstants.Android, this.$projectData)) {
+			this.$errors.fail(`Applications for platform ${this.$devicePlatformsConstants.Android} can not be built on this OS`);
+		}
+
 		if (this.$options.release && (!this.$options.keyStorePath || !this.$options.keyStorePassword || !this.$options.keyStoreAlias || !this.$options.keyStoreAliasPassword)) {
 			this.$errors.fail("When producing a release build, you need to specify all --key-store-* options.");
 		}
-		return args.length === 0 && await this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.Android);
+		return this.$platformService.validateOptions(this.$options.provision, this.$projectData, this.$platformsData.availablePlatforms.Android);
 	}
 }
 

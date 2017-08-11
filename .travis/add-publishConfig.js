@@ -1,25 +1,21 @@
 #!/usr/bin/env node
 
-var fsModule = require('fs');
+const fsModule = require("fs");
+const path = "./package.json";
+const fileOptions = {encoding: "utf-8"};
+const content = fsModule.readFileSync(path, fileOptions);
 
-//Adds a publishConfig section to the package.json file
-// and sets a tag to it
-
-var path = './package.json';
-var fileOptions = {encoding: "utf-8"};
-var content = fsModule.readFileSync(path, fileOptions);
-
-var tag = process.argv[2];
-if (!tag) {
-    console.log('Please pass the tag name as an argument!');
-    process.exit(1);
-}
-
-var packageDef = JSON.parse(content);
+const packageDef = JSON.parse(content);
 if (!packageDef.publishConfig) {
     packageDef.publishConfig = {};
 }
-packageDef.publishConfig.tag = tag;
 
-var newContent = JSON.stringify(packageDef, null, '  ');
+const branch = process.argv[2];
+if (!branch) {
+    console.log("Please pass the branch name as an argument!");
+    process.exit(1);
+}
+packageDef.publishConfig.tag = branch === "release" ? "rc" : "next";
+
+const newContent = JSON.stringify(packageDef, null, "  ");
 fsModule.writeFileSync(path, newContent, fileOptions);

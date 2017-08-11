@@ -150,6 +150,37 @@ interface INpmPeerDependencyInfo {
 }
 
 /**
+ * Describes information about dependency update packages.
+ */
+interface INpm5DependencyInfo {
+	/**
+	 * Npm action type.
+	 * @type {string}
+	 */
+	action: string;
+	/**
+	 * Dependency name.
+	 * @type {string}
+	 */
+	name: string;
+	/**
+	 * Dependency version.
+	 * @type {string}
+	 */
+	version: string;
+	/**
+	 * Destination of the installation.
+	 * @type {string}
+	 */
+	path: string;
+	/**
+	 * Dependency previous version.
+	 * @type {string}
+	 */
+	previousVersion: string;
+}
+
+/**
  * Describes information returned by the npm CLI upon calling install with --json flag.
  */
 interface INpmInstallCLIResult {
@@ -176,6 +207,47 @@ interface INpmInstallCLIResult {
 }
 
 /**
+ * Describes information returned by the npm 5 CLI upon calling install with --json flag.
+ */
+interface INpm5InstallCliResult {
+	/**
+	 * Added dependencies. Note that whenever add a particular dependency with npm 5 it is listed inside of array with key "Added".
+	 * @type {INpmDependencyUpdateInfo[]}
+	 */
+	added: INpm5DependencyInfo[];
+	/**
+	 * Removed dependencies. Note that whenever remove a particular dependency with npm 5 it is listed inside of array with key "removed".
+	 * @type {INpmDependencyUpdateInfo[]}
+	 */
+	removed: INpm5DependencyInfo[];
+	/**
+	 * Updated dependencies. Note that whenever update a particular dependency with npm 5 it is listed inside of array with key "updated".
+	 * @type {INpmDependencyUpdateInfo[]}
+	 */
+	updated: INpm5DependencyInfo[];
+	/**
+	 * Moved dependencies. Note that whenever move a particular dependency with npm 5 it is listed inside of array with key "moved".
+	 * @type {INpmDependencyUpdateInfo[]}
+	 */
+	moved: INpm5DependencyInfo[];
+	/**
+	 * Failed dependencies. Note that whenever use npm 5 and the operation over particular dependency fail it is listed inside of array with key "failed".
+	 * @type {INpmDependencyUpdateInfo[]}
+	 */
+	failed: INpm5DependencyInfo[];
+	/**
+	 * Warnings. Note that whenever use npm 5 and the operation over particular dependency have warnings they are listed inside of array with key "warnings".
+	 * @type {INpmDependencyUpdateInfo[]}
+	 */
+	warnings: INpm5DependencyInfo[];
+	/**
+	 *Time elapsed.
+	 * @type {Number}
+	 */
+	elapsed: Number
+}
+
+/**
  * Describes information about installed package.
  */
 interface INpmInstallResultInfo {
@@ -193,7 +265,7 @@ interface INpmInstallResultInfo {
 	 * The original output that npm CLI produced upon installation.
 	 * @type {INpmInstallCLIResult}
 	 */
-	originalOutput: INpmInstallCLIResult;
+	originalOutput?: INpmInstallCLIResult | INpm5InstallCliResult;
 }
 
 interface INpmInstallOptions {
@@ -202,12 +274,36 @@ interface INpmInstallOptions {
 	dependencyType?: string;
 }
 
+/**
+ * Describes npm package installed in node_modules.
+ */
 interface IDependencyData {
+	/**
+	 * The name of the package.
+	 */
 	name: string;
-	version: string;
-	nativescript: any;
-	dependencies?: IStringDictionary;
-	devDependencies?: IStringDictionary;
+
+	/**
+	 * The full path where the package is installed.
+	 */
+	directory: string;
+
+	/**
+	 * The depth inside node_modules dir, where the package is located.
+	 * The <project_dir>/node_modules/ is level 0.
+	 * Level 1 is <project dir>/node_modules/<package name>/node_modules, etc.
+	 */
+	depth: number;
+
+	/**
+	 * Describes the `nativescript` key in package.json of a dependency.
+	 */
+	nativescript?: any;
+
+	/**
+	 * Dependencies of the current module.
+	 */
+	dependencies?: string[];
 }
 
 interface IStaticConfig extends Config.IStaticConfig { }
@@ -231,37 +327,6 @@ interface ILockFile {
 
 interface IOpener {
 	open(target: string, appname: string): void;
-}
-
-interface ILiveSyncService {
-	liveSync(platform: string, projectData: IProjectData, applicationReloadAction?: (deviceAppData: Mobile.IDeviceAppData) => Promise<void>): Promise<void>;
-}
-
-interface INativeScriptDeviceLiveSyncService extends IDeviceLiveSyncServiceBase {
-	/**
-	 * Refreshes the application's content on a device
-	 * @param  {Mobile.IDeviceAppData} deviceAppData Information about the application and the device.
-	 * @param  {Mobile.ILocalToDevicePathData[]} localToDevicePaths Object containing a mapping of file paths from the system to the device.
-	 * @param  {boolean} forceExecuteFullSync If this is passed a full LiveSync is performed instead of an incremental one.
-	 * @param  {IProjectData} projectData Project data.
-	 * @return {Promise<void>}
-	 */
-	refreshApplication(deviceAppData: Mobile.IDeviceAppData, localToDevicePaths: Mobile.ILocalToDevicePathData[], forceExecuteFullSync: boolean, projectData: IProjectData): Promise<void>;
-	/**
-	 * Removes specified files from a connected device
-	 * @param  {string} appIdentifier Application identifier.
-	 * @param  {Mobile.ILocalToDevicePathData[]} localToDevicePaths Object containing a mapping of file paths from the system to the device.
-	 * @param  {string} projectId Project identifier - for example org.nativescript.livesync.
-	 * @return {Promise<void>}
-	 */
-	removeFiles(appIdentifier: string, localToDevicePaths: Mobile.ILocalToDevicePathData[], projectId: string): Promise<void>;
-	afterInstallApplicationAction?(deviceAppData: Mobile.IDeviceAppData, localToDevicePaths: Mobile.ILocalToDevicePathData[], projectId: string): Promise<boolean>;
-}
-
-interface IPlatformLiveSyncService {
-	fullSync(projectData: IProjectData, postAction?: (deviceAppData: Mobile.IDeviceAppData, localToDevicePaths: Mobile.ILocalToDevicePathData[]) => Promise<void>): Promise<void>;
-	partialSync(event: string, filePath: string, dispatcher: IFutureDispatcher, afterFileSyncAction: (deviceAppData: Mobile.IDeviceAppData, localToDevicePaths: Mobile.ILocalToDevicePathData[]) => Promise<void>, projectData: IProjectData): Promise<void>;
-	refreshApplication(deviceAppData: Mobile.IDeviceAppData, localToDevicePaths: Mobile.ILocalToDevicePathData[], isFullSync: boolean, projectData: IProjectData): Promise<void>;
 }
 
 interface IBundle {
@@ -343,9 +408,6 @@ interface IRunPlatformOptions extends IJustLaunch, IDeviceEmulator { }
 interface IDeployPlatformOptions extends IAndroidReleaseOptions, IPlatformTemplate, IRelease, IClean, IDeviceEmulator, IProvision, ITeamIdentifier {
 	projectDir: string;
 	forceInstall?: boolean;
-}
-
-interface IEmulatePlatformOptions extends IJustLaunch, IDeployPlatformOptions, IAvailableDevices, IAvd {
 }
 
 interface IUpdatePlatformOptions extends IPlatformTemplate {
@@ -495,11 +557,6 @@ interface IiOSNotification {
 	getAttachAvailable(projectId: string): string;
 }
 
-interface IiOSNotificationService {
-	awaitNotification(deviceIdentifier: string, socket: number, timeout: number): Promise<string>;
-	postNotification(deviceIdentifier: string, notification: string, commandType?: string): Promise<string>;
-}
-
 interface IiOSSocketRequestExecutor {
 	executeLaunchRequest(deviceIdentifier: string, timeout: number, readyForAttachTimeout: number, projectId: string, shouldBreak?: boolean): Promise<void>;
 	executeAttachRequest(device: Mobile.IiOSDevice, timeout: number, projectId: string): Promise<void>;
@@ -547,10 +604,9 @@ interface IVersionsService {
 	getRuntimesVersions(): Promise<IVersionInformation[]>;
 
 	/**
-	 * Gets versions information about the nativescript components with new.
-	 * @return {Promise<IVersionInformation[]>} The version information.
+	 * Checks version information about the nativescript components and prints available updates if any.
 	 */
-	getComponentsForUpdate(): Promise<IVersionInformation[]>;
+	checkComponentsForUpdate(): Promise<void>;
 
 	/**
 	 * Gets versions information about all nativescript components.

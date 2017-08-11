@@ -13,7 +13,6 @@ import { DeviceAppDataFactory } from "../lib/common/mobile/device-app-data/devic
 import { LocalToDevicePathDataFactory } from "../lib/common/mobile/local-to-device-path-data-factory";
 import { MobileHelper } from "../lib/common/mobile/mobile-helper";
 import { ProjectFilesProvider } from "../lib/providers/project-files-provider";
-import { DeviceAppDataProvider } from "../lib/providers/device-app-data-provider";
 import { MobilePlatformsCapabilities } from "../lib/mobile-platforms-capabilities";
 import { DevicePlatformsConstants } from "../lib/common/mobile/device-platforms-constants";
 import { XmlValidator } from "../lib/xml-validator";
@@ -31,6 +30,7 @@ function createTestInjector() {
 	testInjector.register('platformService', PlatformServiceLib.PlatformService);
 	testInjector.register('errors', stubs.ErrorsStub);
 	testInjector.register('logger', stubs.LoggerStub);
+	testInjector.register("nodeModulesDependenciesBuilder", {});
 	testInjector.register('npmInstallationManager', stubs.NpmInstallationManagerStub);
 	testInjector.register('projectData', stubs.ProjectDataStub);
 	testInjector.register('platformsData', stubs.PlatformsDataStub);
@@ -48,6 +48,9 @@ function createTestInjector() {
 	testInjector.register("staticConfig", StaticConfigLib.StaticConfig);
 	testInjector.register("nodeModulesBuilder", {
 		prepareNodeModules: () => {
+			return Promise.resolve();
+		},
+		prepareJSNodeModules: () => {
 			return Promise.resolve();
 		}
 	});
@@ -69,7 +72,6 @@ function createTestInjector() {
 	testInjector.register("localToDevicePathDataFactory", LocalToDevicePathDataFactory);
 	testInjector.register("mobileHelper", MobileHelper);
 	testInjector.register("projectFilesProvider", ProjectFilesProvider);
-	testInjector.register("deviceAppDataProvider", DeviceAppDataProvider);
 	testInjector.register("mobilePlatformsCapabilities", MobilePlatformsCapabilities);
 	testInjector.register("devicePlatformsConstants", DevicePlatformsConstants);
 	testInjector.register("xmlValidator", XmlValidator);
@@ -82,9 +84,10 @@ function createTestInjector() {
 	testInjector.register("projectChangesService", ProjectChangesLib.ProjectChangesService);
 	testInjector.register("emulatorPlatformService", stubs.EmulatorPlatformService);
 	testInjector.register("analyticsService", {
-		track: async () => undefined
+		track: async (): Promise<any[]> => undefined
 	});
 	testInjector.register("messages", Messages);
+	testInjector.register("devicePathProvider", {});
 
 	return testInjector;
 }
@@ -382,6 +385,12 @@ describe('Platform Service Tests', () => {
 
 			let appDestFolderPath = path.join(tempFolder, "appDest");
 			let appResourcesFolderPath = path.join(appDestFolderPath, "App_Resources");
+			fs.writeJson(path.join(tempFolder, "package.json"), {
+				name: "testname",
+				nativescript: {
+					id: "org.nativescript.testname"
+				}
+			});
 
 			return { tempFolder, appFolderPath, app1FolderPath, appDestFolderPath, appResourcesFolderPath };
 		}

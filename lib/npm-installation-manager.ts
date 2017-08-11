@@ -42,30 +42,41 @@ export class NpmInstallationManager implements INpmInstallationManager {
 		} catch (error) {
 			this.$logger.debug(error);
 
-			throw new Error(error);
+			throw error;
 		}
 	}
 
 	public async getInspectorFromCache(inspectorNpmPackageName: string, projectDir: string): Promise<string> {
-		let inspectorPath = path.join(projectDir, "node_modules", inspectorNpmPackageName);
+		let inspectorPath = path.join(projectDir, constants.NODE_MODULES_FOLDER_NAME, inspectorNpmPackageName);
 
 		// local installation takes precedence over cache
 		if (!this.inspectorAlreadyInstalled(inspectorPath)) {
-			let cachepath = (await this.$childProcess.exec("npm get cache")).trim();
-			let version = await this.getLatestCompatibleVersion(inspectorNpmPackageName);
-			let pathToPackageInCache = path.join(cachepath, inspectorNpmPackageName, version);
-			let pathToUnzippedInspector = path.join(pathToPackageInCache, "package");
+			const cachePath = path.join(this.$options.profileDir, constants.INSPECTOR_CACHE_DIRNAME);
+			this.prepareCacheDir(cachePath);
+			const pathToPackageInCache = path.join(cachePath, constants.NODE_MODULES_FOLDER_NAME, inspectorNpmPackageName);
 
 			if (!this.$fs.exists(pathToPackageInCache)) {
-				await this.$childProcess.exec(`npm cache add ${inspectorNpmPackageName}@${version}`);
-				let inspectorTgzPathInCache = path.join(pathToPackageInCache, "package.tgz");
-				await this.$childProcess.exec(`tar -xf ${inspectorTgzPathInCache} -C ${pathToPackageInCache}`);
-				await this.$childProcess.exec(`npm install --prefix ${pathToUnzippedInspector}`);
+				const version = await this.getLatestCompatibleVersion(inspectorNpmPackageName);
+				await this.$childProcess.exec(`npm install ${inspectorNpmPackageName}@${version} --prefix ${cachePath}`);
 			}
+
 			this.$logger.out("Using inspector from cache.");
-			return pathToUnzippedInspector;
+			return pathToPackageInCache;
 		}
+
 		return inspectorPath;
+	}
+
+	private prepareCacheDir(cacheDirName: string): void {
+		this.$fs.ensureDirectoryExists(cacheDirName);
+
+		const cacheDirPackageJsonLocation = path.join(cacheDirName, constants.PACKAGE_JSON_FILE_NAME);
+		if (!this.$fs.exists(cacheDirPackageJsonLocation)) {
+			this.$fs.writeJson(cacheDirPackageJsonLocation, {
+				name: constants.INSPECTOR_CACHE_DIRNAME,
+				version: "0.1.0"
+			});
+		}
 	}
 
 	private inspectorAlreadyInstalled(pathToInspector: string): Boolean {
@@ -80,11 +91,9 @@ export class NpmInstallationManager implements INpmInstallationManager {
 		if (this.$fs.exists(possiblePackageName)) {
 			packageName = possiblePackageName;
 		}
-		if (packageName.indexOf(".tgz") >= 0) {
-			version = null;
-		}
+
 		// check if the packageName is url or local file and if it is, let npm install deal with the version
-		if (this.isURL(packageName) || this.$fs.exists(packageName)) {
+		if (this.isURL(packageName) || this.$fs.exists(packageName) || this.isTgz(packageName)) {
 			version = null;
 		} else {
 			version = version || await this.getLatestCompatibleVersion(packageName);
@@ -97,7 +106,11 @@ export class NpmInstallationManager implements INpmInstallationManager {
 		return pathToInstalledPackage;
 	}
 
-	private isURL(str: string) {
+	private isTgz(packageName: string): boolean {
+		return packageName.indexOf(".tgz") >= 0;
+	}
+
+	private isURL(str: string): boolean {
 		let urlRegex = '^(?!mailto:)(?:(?:http|https|ftp)://)(?:\\S+(?::\\S*)?@)?(?:(?:(?:[1-9]\\d?|1\\d\\d|2[01]\\d|22[0-3])(?:\\.(?:1?\\d{1,2}|2[0-4]\\d|25[0-5])){2}(?:\\.(?:[0-9]\\d?|1\\d\\d|2[0-4]\\d|25[0-4]))|(?:(?:[a-z\\u00a1-\\uffff0-9]+-?)*[a-z\\u00a1-\\uffff0-9]+)(?:\\.(?:[a-z\\u00a1-\\uffff0-9]+-?)*[a-z\\u00a1-\\uffff0-9]+)*(?:\\.(?:[a-z\\u00a1-\\uffff]{2,})))|localhost)(?::\\d{2,5})?(?:(/|\\?|#)[^\\s]*)?$';
 		let url = new RegExp(urlRegex, 'i');
 		return str.length < 2083 && url.test(str);
@@ -108,7 +121,7 @@ export class NpmInstallationManager implements INpmInstallationManager {
 
 		packageName = packageName + (version ? `@${version}` : "");
 
-		let npmOptions: any = { silent: true };
+		let npmOptions: any = { silent: true, "save-exact": true };
 
 		if (dependencyType) {
 			npmOptions[dependencyType] = true;

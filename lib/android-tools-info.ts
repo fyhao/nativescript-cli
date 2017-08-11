@@ -5,7 +5,7 @@ import { cache } from "./common/decorators";
 
 export class AndroidToolsInfo implements IAndroidToolsInfo {
 	private static ANDROID_TARGET_PREFIX = "android";
-	private static SUPPORTED_TARGETS = ["android-17", "android-18", "android-19", "android-21", "android-22", "android-23", "android-24", "android-25"];
+	private static SUPPORTED_TARGETS = ["android-17", "android-18", "android-19", "android-21", "android-22", "android-23", "android-24", "android-25", "android-26"];
 	private static MIN_REQUIRED_COMPILE_TARGET = 22;
 	private static REQUIRED_BUILD_TOOLS_RANGE_PREFIX = ">=23";
 	private static VERSION_REGEX = /((\d+\.){2}\d+)/;
@@ -317,11 +317,12 @@ export class AndroidToolsInfo implements IAndroidToolsInfo {
 	@cache()
 	private getInstalledTargets(): string[] {
 		let installedTargets: string[] = [];
-		const pathToInstalledTargets = path.join(this.androidHome, "platforms");
-		if (this.$fs.exists(pathToInstalledTargets)) {
-			installedTargets = this.$fs.readDirectory(pathToInstalledTargets);
+		if (this.androidHome) {
+			const pathToInstalledTargets = path.join(this.androidHome, "platforms");
+			if (this.$fs.exists(pathToInstalledTargets)) {
+				installedTargets = this.$fs.readDirectory(pathToInstalledTargets);
+			}
 		}
-
 		this.$logger.trace("Installed Android Targets are: ", installedTargets);
 
 		return installedTargets;

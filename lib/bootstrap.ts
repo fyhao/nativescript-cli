@@ -9,8 +9,10 @@ $injector.require("projectData", "./project-data");
 $injector.require("projectDataService", "./services/project-data-service");
 $injector.requirePublic("projectService", "./services/project-service");
 $injector.require("androidProjectService", "./services/android-project-service");
+$injector.require("iOSEntitlementsService", "./services/ios-entitlements-service");
 $injector.require("iOSProjectService", "./services/ios-project-service");
 $injector.require("iOSProvisionService", "./services/ios-provision-service");
+$injector.require("xCConfigService", "./services/xcconfig-service");
 
 $injector.require("cocoapodsService", "./services/cocoapods-service");
 
@@ -22,12 +24,13 @@ $injector.require("platformsData", "./platforms-data");
 $injector.require("platformService", "./services/platform-service");
 
 $injector.require("debugDataService", "./services/debug-data-service");
+$injector.requirePublicClass("debugService", "./services/debug-service");
 $injector.require("iOSDebugService", "./services/ios-debug-service");
 $injector.require("androidDebugService", "./services/android-debug-service");
 
 $injector.require("userSettingsService", "./services/user-settings-service");
 $injector.require("analyticsSettingsService", "./services/analytics-settings-service");
-$injector.require("analyticsService", "./services/analytics-service");
+$injector.requirePublic("analyticsService", "./services/analytics-service");
 
 $injector.require("emulatorSettingsService", "./services/emulator-settings-service");
 
@@ -37,6 +40,7 @@ $injector.requireCommand("platform|*list", "./commands/list-platforms");
 $injector.requireCommand("platform|add", "./commands/add-platform");
 $injector.requireCommand("platform|remove", "./commands/remove-platform");
 $injector.requireCommand("platform|update", "./commands/update-platform");
+$injector.requireCommand("run|*all", "./commands/run");
 $injector.requireCommand("run|ios", "./commands/run");
 $injector.requireCommand("run|android", "./commands/run");
 
@@ -49,8 +53,6 @@ $injector.requireCommand("clean-app|android", "./commands/clean-app");
 $injector.requireCommand("build|ios", "./commands/build");
 $injector.requireCommand("build|android", "./commands/build");
 $injector.requireCommand("deploy", "./commands/deploy");
-$injector.requireCommand("emulate|android", "./commands/emulate");
-$injector.requireCommand("emulate|ios", "./commands/emulate");
 
 $injector.require("testExecutionService", "./services/test-execution-service");
 $injector.requireCommand("dev-test|android", "./commands/test");
@@ -74,7 +76,6 @@ $injector.require("commandsServiceProvider", "./providers/commands-service-provi
 $injector.require("deviceAppDataProvider", "./providers/device-app-data-provider");
 
 $injector.require("deviceLogProvider", "./common/mobile/device-log-provider");
-$injector.require("liveSyncProvider", "./providers/livesync-provider");
 $injector.require("projectFilesProvider", "./providers/project-files-provider");
 
 $injector.require("nodeModulesBuilder", "./tools/node-modules/node-modules-builder");
@@ -99,14 +100,16 @@ $injector.require("infoService", "./services/info-service");
 $injector.requireCommand("info", "./commands/info");
 
 $injector.require("androidToolsInfo", "./android-tools-info");
+$injector.require("devicePathProvider", "./device-path-provider");
 
 $injector.requireCommand("platform|clean", "./commands/platform-clean");
 
+$injector.requirePublicClass("liveSyncService", "./services/livesync/livesync-service");
+$injector.require("liveSyncCommandHelper", "./services/livesync/livesync-command-helper");
+$injector.require("debugLiveSyncService", "./services/livesync/debug-livesync-service");
+$injector.require("androidLiveSyncService", "./services/livesync/android-livesync-service");
+$injector.require("iOSLiveSyncService", "./services/livesync/ios-livesync-service");
 $injector.require("usbLiveSyncService", "./services/livesync/livesync-service"); // The name is used in https://github.com/NativeScript/nativescript-dev-typescript
-$injector.require("iosLiveSyncServiceLocator", "./services/livesync/ios-device-livesync-service");
-$injector.require("androidLiveSyncServiceLocator", "./services/livesync/android-device-livesync-service");
-$injector.require("platformLiveSyncService", "./services/livesync/platform-livesync-service");
-
 $injector.require("sysInfo", "./sys-info");
 
 $injector.require("iOSNotificationService", "./services/ios-notification-service");
@@ -135,3 +138,6 @@ $injector.requireCommand("extension|*list", "./commands/extensibility/list-exten
 $injector.requireCommand("extension|install", "./commands/extensibility/install-extension");
 $injector.requireCommand("extension|uninstall", "./commands/extensibility/uninstall-extension");
 $injector.requirePublic("extensibilityService", "./services/extensibility-service");
+
+$injector.require("nodeModulesDependenciesBuilder", "./tools/node-modules/node-modules-dependencies-builder");
+$injector.require("subscriptionService", "./services/subscription-service");
