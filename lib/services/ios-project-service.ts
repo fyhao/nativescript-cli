@@ -434,6 +434,7 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 	}
 
 	private async setupSigningFromProvision(projectRoot: string, projectData: IProjectData, provision?: string, mobileProvisionData?: mobileprovision.provision.MobileProvision): Promise<void> {
+		this.$logger.out("fyhao DEBUG setupSigningFromProvision 0: projectRoot=" + projectRoot);
 		if (provision) {
 			const xcode = this.$pbxprojDomXcode.Xcode.open(this.getPbxProjPath(projectData));
 			const signing = xcode.getSigning(projectData.projectName);
@@ -459,7 +460,7 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 				if (!mobileprovision) {
 					this.$errors.failWithoutHelp("Failed to find mobile provision with UUID or Name: " + provision);
 				}
-
+				this.$logger.out("fyhao DEBUG setupSigningFromProvision 1: setManualSigningStyle identity=" + (!process.env.CODE_SIGN_IDENTITY ? (mobileprovision.Type === "Development" ? "iPhone Developer" : "iPhone Distribution") : process.env.CODE_SIGN_IDENTITY));
 				xcode.setManualSigningStyle(projectData.projectName, {
 					team: mobileprovision.TeamIdentifier && mobileprovision.TeamIdentifier.length > 0 ? mobileprovision.TeamIdentifier[0] : undefined,
 					uuid: mobileprovision.UUID,
