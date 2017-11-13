@@ -855,6 +855,7 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 	}
 
 	private getXcodeprojPath(projectData: IProjectData): string {
+		this.$logger.out("fyhao DEBUG getXcodeprojPath 0"); // temp debug
 		return path.join(this.getPlatformData(projectData).projectRoot, projectData.projectName + IOSProjectService.XCODE_PROJECT_EXT_NAME);
 	}
 
@@ -884,6 +885,7 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 	}
 
 	private getPbxProjPath(projectData: IProjectData): string {
+		this.$logger.out("fyhao DEBUG getPbxProjPath 0"); // temp debug
 		return path.join(this.getXcodeprojPath(projectData), "project.pbxproj");
 	}
 
