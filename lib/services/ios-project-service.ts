@@ -481,6 +481,7 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 	private async setupSigningForDevice(projectRoot: string, buildConfig: IiOSBuildConfig, projectData: IProjectData): Promise<void> {
 		this.$logger.out("fyhao DEBUG setupSigningForDevice 0"); // temp debug
 		const xcode = this.$pbxprojDomXcode.Xcode.open(this.getPbxProjPath(projectData));
+		this.$logger.out("fyhao DEBUG setupSigningForDevice 0.1 after xcode opened"); // temp debug
 		const signing = xcode.getSigning(projectData.projectName);
 		this.$logger.out("fyhao DEBUG setupSigningForDevice 1"); // temp debug
 		const hasProvisioningProfileInXCConfig =
@@ -856,7 +857,6 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 
 	private getXcodeprojPath(projectData: IProjectData): string {
 		this.$logger.out("fyhao DEBUG getXcodeprojPath 0"); // temp debug
-		console.log(projectData)
 		this.$logger.out("fyhao DEBUG getXcodeprojPath 1.1 projectRoot: " + this.getPlatformData(projectData).projectRoot);
 		this.$logger.out("fyhao DEBUG getXcodeprojPath 1.2 projectName: " + projectData.projectName)
 		this.$logger.out("fyhao DEBUG getXcodeprojPath 1.3 XCODE_PROJECT_EXT_NAME: " + IOSProjectService.XCODE_PROJECT_EXT_NAME);
