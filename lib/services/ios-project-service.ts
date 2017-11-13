@@ -388,7 +388,9 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 		]);
 		this.$logger.out("fyhao DEBUG buildForDevice 2"); // temp debug
 		let xcodeBuildVersion = await this.getXcodeVersion();
+		this.$logger.out("fyhao DEBUG buildForDevice 2.1 xcodeBuildVersion=" + xcodeBuildVersion); // temp debug
 		if (helpers.versionCompare(xcodeBuildVersion, "8.0") >= 0) {
+			this.$logger.out("fyhao DEBUG buildForDevice 2.2");
 			await this.setupSigningForDevice(projectRoot, buildConfig, projectData);
 		}
 		this.$logger.out("fyhao DEBUG buildForDevice 3"); // temp debug
