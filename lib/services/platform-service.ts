@@ -462,7 +462,7 @@ export class PlatformService extends EventEmitter implements IPlatformService {
 	}
 
 	public async buildPlatform(platform: string, buildConfig: IBuildConfig, projectData: IProjectData): Promise<void> {
-		this.$logger.out("Building project... fyhao DEBUG"); // temp debug
+		this.$logger.out("Building project... fyhao DEBUG, platform: " + platform); // temp debug
 
 		await this.trackProjectType(projectData);
 		const isForDevice = this.$mobileHelper.isAndroidPlatform(platform) ? null : buildConfig && buildConfig.buildForDevice;
