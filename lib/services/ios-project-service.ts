@@ -460,12 +460,14 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 				if (!mobileprovision) {
 					this.$errors.failWithoutHelp("Failed to find mobile provision with UUID or Name: " + provision);
 				}
-				this.$logger.out("fyhao DEBUG setupSigningFromProvision 1: setManualSigningStyle identity=" + (!process.env.CODE_SIGN_IDENTITY ? (mobileprovision.Type === "Development" ? "iPhone Developer" : "iPhone Distribution") : process.env.CODE_SIGN_IDENTITY));
+				let identity = !process.env.CODE_SIGN_IDENTITY ? (mobileprovision.Type === "Development" ? "iPhone Developer" : "iPhone Distribution") : process.env.CODE_SIGN_IDENTITY;
+				identity = identity.substring(1, identity.length - 1);
+				this.$logger.out("fyhao DEBUG setupSigningFromProvision 1: setManualSigningStyle identity=" + (identity));
 				xcode.setManualSigningStyle(projectData.projectName, {
 					team: mobileprovision.TeamIdentifier && mobileprovision.TeamIdentifier.length > 0 ? mobileprovision.TeamIdentifier[0] : undefined,
 					uuid: mobileprovision.UUID,
 					name: mobileprovision.Name,
-					identity: !process.env.CODE_SIGN_IDENTITY ? (mobileprovision.Type === "Development" ? "iPhone Developer" : "iPhone Distribution") : process.env.CODE_SIGN_IDENTITY // FIX for issue refer to https://github.com/fyhao/tns-webform-client/issues/6
+					identity: identity // FIX for issue refer to https://github.com/fyhao/tns-webform-client/issues/6
 				});
 				xcode.save();
 
