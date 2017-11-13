@@ -479,6 +479,7 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 	}
 
 	private async setupSigningForDevice(projectRoot: string, buildConfig: IiOSBuildConfig, projectData: IProjectData): Promise<void> {
+		this.$logger.out("fyhao DEBUG setupSigningForDevice 0"); // temp debug
 		const xcode = this.$pbxprojDomXcode.Xcode.open(this.getPbxProjPath(projectData));
 		const signing = xcode.getSigning(projectData.projectName);
 		this.$logger.out("fyhao DEBUG setupSigningForDevice 1"); // temp debug
