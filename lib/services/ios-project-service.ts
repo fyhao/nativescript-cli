@@ -387,6 +387,7 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 			"CONFIGURATION_BUILD_DIR=" + path.join(projectRoot, "build", "device")
 		]);
 		this.$logger.out("fyhao DEBUG buildForDevice 2"); // temp debug
+		this.$logger.out("fyhao DEBUG buildForDevice 2.01: before getXcodeVersion"); // temp debug
 		let xcodeBuildVersion = await this.getXcodeVersion();
 		this.$logger.out("fyhao DEBUG buildForDevice 2.1 xcodeBuildVersion=" + xcodeBuildVersion); // temp debug
 		if (helpers.versionCompare(xcodeBuildVersion, "8.0") >= 0) {
