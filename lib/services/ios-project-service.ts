@@ -461,7 +461,9 @@ this.$logger.out("fyhao DEBUG buildProject 2"); // temp debug
 					this.$errors.failWithoutHelp("Failed to find mobile provision with UUID or Name: " + provision);
 				}
 				let identity = !process.env.CODE_SIGN_IDENTITY ? (mobileprovision.Type === "Development" ? "iPhone Developer" : "iPhone Distribution") : process.env.CODE_SIGN_IDENTITY;
-				identity = identity.substring(1, identity.length - 1);
+				if(identity.startsWith('"') && identity.endsWith('"')) {
+					identity = identity.substring(1, identity.length - 1);
+				}
 				this.$logger.out("fyhao DEBUG setupSigningFromProvision 1: setManualSigningStyle identity=" + (identity));
 				xcode.setManualSigningStyle(projectData.projectName, {
 					team: mobileprovision.TeamIdentifier && mobileprovision.TeamIdentifier.length > 0 ? mobileprovision.TeamIdentifier[0] : undefined,
