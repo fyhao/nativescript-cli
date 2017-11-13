@@ -857,8 +857,12 @@ We will now place an empty obsolete compatability white screen LauncScreen.xib f
 	private getXcodeprojPath(projectData: IProjectData): string {
 		this.$logger.out("fyhao DEBUG getXcodeprojPath 0"); // temp debug
 		console.log(projectData)
-		this.$logger.out("fyhao DEBUG getXcodeprojPath 1 isNull " + (null != this.getPlatformData(projectData)));
-		return path.join(this.getPlatformData(projectData).projectRoot, projectData.projectName + IOSProjectService.XCODE_PROJECT_EXT_NAME);
+		this.$logger.out("fyhao DEBUG getXcodeprojPath 1.1 projectRoot: " + this.getPlatformData(projectData).projectRoot);
+		this.$logger.out("fyhao DEBUG getXcodeprojPath 1.2 projectName: " + projectData.projectName)
+		this.$logger.out("fyhao DEBUG getXcodeprojPath 1.3 XCODE_PROJECT_EXT_NAME: " + IOSProjectService.XCODE_PROJECT_EXT_NAME);
+		let thePath = path.join(this.getPlatformData(projectData).projectRoot, projectData.projectName + IOSProjectService.XCODE_PROJECT_EXT_NAME);
+		this.$logger.out("fyhao DEBUG getXcodeprojPath 1.4 return : " + thePath)
+		return thePath;
 	}
 
 	private getProjectPodFilePath(projectData: IProjectData): string {
