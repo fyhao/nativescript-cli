@@ -240,7 +240,7 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
 	</dict>
 </dict>
 </plist>`;
-
+		this.$logger.out("fyhao DEBUG exportArchive 1 plistTemplate: " + plistTemplate); 
 		// Save the options...
 		temp.track();
 		let exportOptionsPlist = temp.path({ prefix: "export-", suffix: ".plist" });
