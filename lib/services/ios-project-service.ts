@@ -233,6 +233,11 @@ export class IOSProjectService extends projectServiceBaseLib.PlatformProjectServ
     <false/>
 	<key>compileBitcode</key>  <!--- Added --->
     <false/>   <!--- Added --->
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>tnswebformprofile2020.mobileprovision.mobileprovision</key>
+		<string>distribution</string>
+	</dict>
 </dict>
 </plist>`;
 
